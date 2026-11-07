@@ -44,7 +44,7 @@ Found while migrating our Loom workspace to a self-hosted Cap instance. Checked 
 | # | Improvement | Why | Upstream state | Decision |
 | --- | --- | --- | --- | --- |
 | 1 | Loom link map: export Loom URL to Cap URL | Old `loom.com` links in tickets and PRs stop working once Loom is cancelled. We can't redirect Loom's domain, so we rewrite the links. | Nothing open. The `imported_videos` table already keeps the Loom video id. | Internal script first (no patch). Propose an export button upstream later. |
-| 2 | Org admins can browse members' libraries | Admins only see their own caps and what is shared with the org | Nothing open | Open an issue first: this is a product and privacy decision. Our `cap-admin-library-sync` function covers it meanwhile. |
+| 2 | ~~Org admins can browse members' libraries~~ | Not wanted: upstream's default (admins only see their own caps and what is shared with them) is the right behavior. We only need it temporarily, to clean up personal or junk videos after the Loom migration. | — | Dropped. The `cap-admin-library-sync` function and its private space are temporary and get removed after the cleanup. |
 | 3 | Transfer organization ownership | No way to move the owner role | Nothing open. Related: [#2741](https://github.com/CapSoftware/Cap/pull/2741) (single recording transfer, maintainer, open) and org-to-org content transfer (merged in July). | Open an issue first |
 | 4 | `CAP_DISABLE_ORGANIZATION_CREATION` | Single-org self-hosted instances need to stop new orgs (UI, signup and API) | Nothing open | PR. Small, self-hosting only. |
 | 5 | Hide storage integrations that are not configured | Google Drive "Connect" shows without Google credentials and fails | Nothing open | PR. Small. |
