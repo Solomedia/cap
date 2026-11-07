@@ -24,25 +24,45 @@ Flow for every improvement:
 
 Only the server side: `apps/web`, `apps/media-server` and shared `packages/*`. The desktop app, CLI and Chrome extension stay on the official builds.
 
+## How upstream reviews contributions
+
+Measured on 2026-11-06 from the last ~3,000 pull requests.
+
+- Very active: about 550 internal pull requests merged in the last three months. One maintainer (`richiemcilroy`) merges every pull request.
+- External pull requests since August 2026: 74% merged, median 24 hours to merge. In the web and self-hosting scope (`web`, `web-backend`, `media-server`, `loom`, `storage`): 85% merged, median 28 hours.
+- A new contributor's first pull request: 57% merged, median about 3.5 days.
+- Gates: a Greptile review must reach 5/5 before merge, and CI on a first-time contributor's pull request waits for maintainer approval.
+- Stale sweeps: pull requests that fall behind `main` are closed as stale after about a month ("reopen against current main"). This is how both pull requests for [#1993](https://github.com/CapSoftware/Cap/issues/1993) were closed.
+- Some issues carry bounties (`💎 Bounty`, `$30` to `$500` labels).
+
+What this means for us: send small pull requests, one concern each, with tests. Answer Greptile the same day, and rebase until merged. Main moves by hundreds of pull requests a month, so every patch we carry in `smg` costs rebase work. Carry as few as possible.
+
 ## Improvement roadmap
 
-Found while migrating our Loom workspace to a self-hosted Cap instance.
+Found while migrating our Loom workspace to a self-hosted Cap instance. Checked against upstream issues and pull requests on 2026-11-06.
 
-| # | Improvement | Why | Upstream | Status |
+| # | Improvement | Why | Upstream state | Decision |
 | --- | --- | --- | --- | --- |
-| 1 | Loom link lookup: `/loom/<loomId>` resolves to the imported cap, plus a mapping export (Loom URL to Cap URL) | Old `loom.com` links in tickets and PRs stop working once Loom is cancelled; we can't redirect Loom's domain, so we need the mapping to rewrite them | PR | Planned |
-| 2 | Org admins can browse members' libraries | Admins can only see their own caps and what is shared with the org | PR (behind a setting) | Planned |
-| 3 | Transfer organization ownership | No way to move the owner role today | PR | Planned |
-| 4 | `CAP_DISABLE_ORGANIZATION_CREATION` | Self-hosted single-org instances need to stop new orgs (UI, signup and API) | PR | Planned |
-| 5 | Hide storage integrations that are not configured | Google Drive "Connect" is enabled without Google credentials and fails | PR | Planned |
-| 6 | Loom import reassignment keeps sharing and spaces | Reassigning an imported cap makes it private and removes it from spaces | PR | Planned |
-| 7 | Loom import into an organization folder (`--folder`), not only a space | Teams that organize by folders end up with one space per Loom folder | PR | Planned |
-| 8 | Retry a failed Loom import with a different owner | A failed import can't be re-imported under another owner | PR | Planned |
-| 9 | Skip Pro upsell onboarding steps when self-hosted | Self-hosted users already have every Pro feature | PR | Planned |
-| 10 | Self-hosting defaults: `CAP_CHROME_EXTENSION_ID` in compose files, S3 checksum mode for non-AWS endpoints (R2) | Extension login fails without it ([#1993](https://github.com/CapSoftware/Cap/issues/1993)); R2 rejects presigned URLs with checksum mode | PR | Planned |
+| 1 | Loom link map: export Loom URL to Cap URL | Old `loom.com` links in tickets and PRs stop working once Loom is cancelled. We can't redirect Loom's domain, so we rewrite the links. | Nothing open. The `imported_videos` table already keeps the Loom video id. | Internal script first (no patch). Propose an export button upstream later. |
+| 2 | Org admins can browse members' libraries | Admins only see their own caps and what is shared with the org | Nothing open | Open an issue first: this is a product and privacy decision. Our `cap-admin-library-sync` function covers it meanwhile. |
+| 3 | Transfer organization ownership | No way to move the owner role | Nothing open. Related: [#2741](https://github.com/CapSoftware/Cap/pull/2741) (single recording transfer, maintainer, open) and org-to-org content transfer (merged in July). | Open an issue first |
+| 4 | `CAP_DISABLE_ORGANIZATION_CREATION` | Single-org self-hosted instances need to stop new orgs (UI, signup and API) | Nothing open | PR. Small, self-hosting only. |
+| 5 | Hide storage integrations that are not configured | Google Drive "Connect" shows without Google credentials and fails | Nothing open | PR. Small. |
+| 6 | Loom reassignment keeps sharing and spaces | Reassign made caps private and removed them from spaces | **Done upstream**: [#3097](https://github.com/CapSoftware/Cap/pull/3097) adds `/api/internal/loom-imports/backfill` with `keepSharing` | Dropped. Use the backfill endpoint. |
+| 7 | Loom import into an organization folder | We ended up with one space per Loom folder | **Mostly done**: [#3097](https://github.com/CapSoftware/Cap/pull/3097) sets `folderId` and `shareFolderId` on imported caps. The CLI still only takes `--space`. | Use the backfill endpoint. A CLI `--folder` flag is optional. |
+| 8 | Retry a failed Loom import with a different owner | A failed import couldn't be re-imported under another owner | Likely covered by [#3091](https://github.com/CapSoftware/Cap/pull/3091) and [#2331](https://github.com/CapSoftware/Cap/pull/2331) | Verify on our instance before doing anything |
+| 9 | Skip Pro upsell onboarding steps when self-hosted | Self-hosted users already have every Pro feature | Nothing open | PR. Small. |
+| 10a | `CAP_CHROME_EXTENSION_ID` in compose files | Extension login fails without it | Issue [#1993](https://github.com/CapSoftware/Cap/issues/1993) open. Pull requests [#1992](https://github.com/CapSoftware/Cap/pull/1992) and [#2035](https://github.com/CapSoftware/Cap/pull/2035) were closed as stale or duplicate, and the docs mention it since [#3521](https://github.com/CapSoftware/Cap/pull/3521). | One fresh PR against current `main` that credits #1992. First PR: lowest risk. |
+| 10b | S3 checksum mode for non-AWS endpoints (R2) | R2 rejects presigned URLs carrying `x-amz-checksum-mode` | No code handles it. Related R2 issues: [#1684](https://github.com/CapSoftware/Cap/issues/1684), [#2384](https://github.com/CapSoftware/Cap/issues/2384). | PR with a repro |
+
+Related upstream threads worth following:
+
+- [#2384](https://github.com/CapSoftware/Cap/issues/2384): the official `cap-web` image is built by hand (`workflow_dispatch`), with gaps of up to two months (2026-09-07 to 2026-11-04).
+- [#1996](https://github.com/CapSoftware/Cap/issues/1996): the compose files don't pass AI provider keys yet ([#2036](https://github.com/CapSoftware/Cap/pull/2036) closed as stale). It matters when we turn on transcription.
+- [#3881](https://github.com/CapSoftware/Cap/pull/3881) (imports over 5 GB in parts) and [#3824](https://github.com/CapSoftware/Cap/pull/3824) (S3 signing without CloudFront): open fixes that affect our setup.
 
 ## Still to set up
 
 - Scheduled sync of `main` from upstream, and a rebase of `smg` that opens an issue on conflict.
-- Image build from `smg` to GHCR for our deployment.
+- Image build to GHCR on our own schedule. Upstream publishes by hand, so even with zero patches this keeps us on the latest fixes.
 - GitHub Actions are disabled by default on forks; enable them when the workflows land.
