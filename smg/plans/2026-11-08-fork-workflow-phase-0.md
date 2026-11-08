@@ -182,7 +182,7 @@ Settings marked **(Hildegar)** need the GitHub UI or an owner account; the rest 
 
 - [ ] **Step 1:** Push `internal/fork-workflow` and open a PR into `smg` titled `Add SMG fork workflow: sync, CI and image pipeline` (English, no AI attribution). Wait for review.
 - [ ] **Step 2 (Hildegar):** Create GitHub App "SMG Cap Bot" in the Solomedia org with repository permissions Contents RW, Pull requests RW, Issues RW, Workflows RW, Actions RW; install it on `Solomedia/cap` only; store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY` as Actions secrets.
-- [ ] **Step 3:** `gh variable set SMG_DEPLOY_FREEZE --body true --repo Solomedia/cap`, plus `RAILWAY_ENVIRONMENT_ID` and `RAILWAY_CAP_WEB_SERVICE_ID` with the values in Global Constraints.
+- [ ] **Step 3:** `gh variable set SMG_DEPLOY_FREEZE --body true --repo Solomedia/cap`, plus `RAILWAY_PROJECT_ID=d280f647-7fe5-4bd2-b5f7-2c1826711eaf`, `RAILWAY_ENVIRONMENT_ID` and `RAILWAY_CAP_WEB_SERVICE_ID` with the values in Global Constraints.
 - [ ] **Step 4:** `gh repo edit Solomedia/cap --enable-auto-merge --enable-merge-commit --enable-squash-merge --delete-branch-on-merge`
 - [ ] **Step 5:** Squash-merge the PR into `smg`. Then `gh repo edit Solomedia/cap --default-branch smg` (scheduled workflows only run from the default branch).
 - [ ] **Step 6:** `GH_TOKEN=$(gh auth token) bun scripts/smg/disable-workflows.ts --repo Solomedia/cap` → every non-`smg-*` workflow shows `disabled_manually` in `gh workflow list --all`.
