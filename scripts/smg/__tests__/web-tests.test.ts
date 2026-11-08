@@ -33,6 +33,16 @@ describe("webTestFiles", () => {
 		]);
 	});
 
+	test("ignores changed tests on a sync PR, where every upstream change counts as changed", () => {
+		expect(
+			webTestFiles({
+				ciYaml: fixture,
+				changedFiles: ["apps/web/__tests__/unit/red-upstream.test.ts"],
+				headRef: "sync/upstream-20261108-0700",
+			}),
+		).toEqual(["__tests__/unit/a.test.ts", "__tests__/unit/b.test.ts"]);
+	});
+
 	test("throws when the step is missing", () => {
 		expect(() =>
 			webTestFiles({

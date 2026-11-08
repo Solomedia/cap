@@ -3,6 +3,8 @@ name: SMG CI
 on:
   pull_request:
     branches: [smg]
+    # labeled/unlabeled re-run the migration gate when `migrations-approved` is added.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 concurrency:
@@ -51,7 +53,28 @@ jobs:
       - name: Typecheck SMG scripts
         run: bun run tsc -p scripts/smg
 
-  # Skipped jobs report success, so these stay usable as required checks.
+  # Migrations run on server start and an image rollback does not undo them.
+  migrations:
+    name: migrations
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
+      - name: Migration gate
+        env:
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_REF: ${{ github.base_ref }}
+        run: bun scripts/smg/migration-gate.ts --base "origin/$BASE_REF"
+
   web:
     name: web
     needs: changes
@@ -80,8 +103,12 @@ jobs:
 
       # Same list upstream's CI runs (read from its ci.yml), plus tests this PR touches.
       - name: Web unit tests
+        env:
+          BASE_REF: ${{ github.base_ref || 'smg' }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          mapfile -t files < <(bun scripts/smg/web-tests.ts --base "origin/${{ github.base_ref || 'smg' }}")
+          list=$(bun scripts/smg/web-tests.ts --base "origin/$BASE_REF" --head "$HEAD_REF")
+          mapfile -t files <<< "$list"
           bun run --cwd apps/web test "${files[@]}"
 
   docker:
@@ -110,3 +137,20 @@ jobs:
           platforms: linux/amd64
           push: false
           cache-from: type=gha,scope=smg-web-amd64
+
+  # The only required check. A skipped job counts as passing for required
+  # checks, so a failed `changes` job would otherwise let untested code merge.
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [changes, scripts, migrations, web, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed or were skipped on purpose
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then
+            exit 1
+          fi

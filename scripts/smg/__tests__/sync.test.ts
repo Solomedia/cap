@@ -63,21 +63,21 @@ describe("hasMigrations", () => {
 
 describe("shouldOpenSyncPr", () => {
 	test("opens when nothing is blocking", () => {
-		expect(
-			shouldOpenSyncPr({ openConflictIssues: 0, openMigrationSyncPrs: 0 }),
-		).toBe(true);
+		expect(shouldOpenSyncPr({ openConflictIssues: 0, openSyncPrs: 0 })).toBe(
+			true,
+		);
 	});
 
 	test("waits while a conflict issue is open", () => {
-		expect(
-			shouldOpenSyncPr({ openConflictIssues: 1, openMigrationSyncPrs: 0 }),
-		).toBe(false);
+		expect(shouldOpenSyncPr({ openConflictIssues: 1, openSyncPrs: 0 })).toBe(
+			false,
+		);
 	});
 
-	test("waits while a migration sync PR is open", () => {
-		expect(
-			shouldOpenSyncPr({ openConflictIssues: 0, openMigrationSyncPrs: 1 }),
-		).toBe(false);
+	test("waits while any sync PR is open", () => {
+		expect(shouldOpenSyncPr({ openConflictIssues: 0, openSyncPrs: 1 })).toBe(
+			false,
+		);
 	});
 });
 

@@ -26,11 +26,12 @@ export function hasMigrations(changedFiles: string[]): string[] {
 	return changedFiles.filter((file) => file.startsWith(MIGRATIONS_PREFIX));
 }
 
+// One sync PR at a time: a red or pending one blocks the next, so nothing stacks.
 export function shouldOpenSyncPr(input: {
 	openConflictIssues: number;
-	openMigrationSyncPrs: number;
+	openSyncPrs: number;
 }): boolean {
-	return input.openConflictIssues === 0 && input.openMigrationSyncPrs === 0;
+	return input.openConflictIssues === 0 && input.openSyncPrs === 0;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { isSmgWorkflow, workflowsToDisable } from "../lib/workflows.ts";
+import {
+	isSmgWorkflow,
+	missingWorkflows,
+	workflowsToDisable,
+} from "../lib/workflows.ts";
 
 describe("isSmgWorkflow", () => {
 	test("recognises our workflows", () => {
@@ -38,5 +42,23 @@ describe("workflowsToDisable", () => {
 			{ id: 1, path: ".github/workflows/ci.yml" },
 			{ id: 4, path: ".github/workflows/new-upstream.yml" },
 		]);
+	});
+});
+
+describe("missingWorkflows", () => {
+	test("returns expected paths the API does not list yet", () => {
+		expect(
+			missingWorkflows(
+				[".github/workflows/new-a.yml", ".github/workflows/new-b.yml"],
+				[
+					{ path: ".github/workflows/new-a.yml" },
+					{ path: ".github/workflows/ci.yml" },
+				],
+			),
+		).toEqual([".github/workflows/new-b.yml"]);
+	});
+
+	test("ignores our own new workflows", () => {
+		expect(missingWorkflows([".github/workflows/smg-new.yml"], [])).toEqual([]);
 	});
 });

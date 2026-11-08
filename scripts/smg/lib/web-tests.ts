@@ -6,9 +6,12 @@ type Workflow = {
 	jobs?: Record<string, { steps?: { name?: string; run?: string }[] }>;
 };
 
+// On a sync PR every upstream change counts as "changed", including tests that
+// are red on upstream's own main, so only upstream's list runs there.
 export function webTestFiles(input: {
 	ciYaml: string;
 	changedFiles: string[];
+	headRef?: string;
 }): string[] {
 	const workflow = Bun.YAML.parse(input.ciYaml) as Workflow;
 	const step = Object.values(workflow.jobs ?? {})
@@ -26,7 +29,8 @@ export function webTestFiles(input: {
 	if (upstream.length === 0) {
 		throw new Error(`Step "${STEP_NAME}" lists no test files`);
 	}
-	const changed = input.changedFiles.flatMap((file) => {
+	const isSync = input.headRef?.startsWith("sync/upstream-") ?? false;
+	const changed = (isSync ? [] : input.changedFiles).flatMap((file) => {
 		const match = file.match(WEB_TEST);
 		return match ? [match[1]] : [];
 	});

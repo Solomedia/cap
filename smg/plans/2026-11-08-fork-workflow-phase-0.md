@@ -137,7 +137,7 @@
 - Create: `.github/workflows/smg-ci.yml`
 
 **Interfaces:**
-- Produces: three check runs, the required checks for Task 7: `SMG CI / scripts`, `SMG CI / web`, `SMG CI / docker`.
+- Produces: check runs `scripts`, `migrations`, `web`, `docker` and the aggregate `ci-ok`, the only required check for Task 7.
 
 - [ ] **Step 1:** Write `smg-ci.yml`: `name: SMG CI`, trigger `pull_request` with `branches: [smg]`, plus `workflow_dispatch`. `concurrency` grouped by PR number with `cancel-in-progress: true`. All jobs `ubuntu-latest`.
   - Job `changes`: `dorny/paths-filter@v3` with outputs `web` (`apps/web/**`, `packages/**`, `bun.lock`, `package.json`, `.github/workflows/smg-*.yml`) and `scripts` (`scripts/smg/**`).
@@ -188,7 +188,9 @@ Settings marked **(Hildegar)** need the GitHub UI or an owner account; the rest 
 - [ ] **Step 6:** `GH_TOKEN=$(gh auth token) bun scripts/smg/disable-workflows.ts --repo Solomedia/cap` → every non-`smg-*` workflow shows `disabled_manually` in `gh workflow list --all`.
 - [ ] **Step 7:** Rulesets via `gh api repos/Solomedia/cap/rulesets`:
   - `main`: block deletion and non-fast-forward; restrict updates with the SMG Cap Bot app as the only bypass actor.
-  - `smg`: block deletion and non-fast-forward; require a pull request (0 approvals); required status checks `scripts`, `web`, `docker` from `SMG CI`.
+  - `smg`: block deletion and non-fast-forward; require a pull request (0 approvals); required status check `ci-ok`, pinned to the GitHub Actions app.
+  - Environment `production` with deployment branches limited to `smg` (Phase 1 stores `RAILWAY_TOKEN` there).
+  - Label `migrations-approved`; default `GITHUB_TOKEN` workflow permissions set to read-only.
 - [ ] **Step 8:** Verify: `gh api repos/Solomedia/cap/rulesets` lists both; `git push origin HEAD:main` from a scratch commit is rejected (then delete the scratch commit locally).
 
 ### Task 8: End-to-end check

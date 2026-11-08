@@ -23,7 +23,8 @@ env:
 jobs:
   build:
     name: build
-    if: github.event_name == 'push' || inputs.digest == ''
+    # Only smg builds production images; a manual run from another branch does nothing.
+    if: github.ref == 'refs/heads/smg' && (github.event_name == 'push' || inputs.digest == '')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -71,7 +72,9 @@ jobs:
   deploy:
     name: deploy
     needs: build
-    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    if: ${{ !cancelled() && github.ref == 'refs/heads/smg' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    # RAILWAY_TOKEN lives in this environment, limited to the smg branch.
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

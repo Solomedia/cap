@@ -70,13 +70,20 @@ if (action === "diverged") {
 	console.log("main diverged from upstream; stopping without touching smg");
 	process.exit(0);
 }
+const addedWorkflows = lines(
+	await $`git diff --name-only --diff-filter=A origin/main upstream/main -- .github/workflows/`.text(),
+);
 if (action === "push") {
 	await $`git push origin upstream/main:refs/heads/main`;
 	console.log(`main fast-forwarded to ${upstreamMain.slice(0, 7)}`);
 }
 
 // 2. New upstream workflows arrive with the push: turn them off and cancel what they started.
-await disableInheritedWorkflows({ repo, dryRun: false });
+await disableInheritedWorkflows({
+	repo,
+	dryRun: false,
+	waitFor: addedWorkflows,
+});
 
 // 3. Anything for smg to take?
 await $`git fetch origin main`.quiet();
@@ -88,22 +95,23 @@ if (behind === 0) {
 	process.exit(0);
 }
 
-// 4. Never stack syncs on top of an unresolved one.
+// 4. One sync at a time: an open sync PR (pending, red or held for migrations)
+// or an open conflict issue blocks the next one.
 const conflictIssues =
 	(await $`gh issue list --repo ${repo} --state open --label ${LABELS.conflict} --json number`.json()) as unknown[];
-const migrationPrs = (
-	(await $`gh pr list --repo ${repo} --state open --label ${LABELS.migrations} --json headRefName`.json()) as {
+const syncPrs = (
+	(await $`gh pr list --repo ${repo} --state open --base smg --json headRefName`.json()) as {
 		headRefName: string;
 	}[]
 ).filter((pr) => pr.headRefName.startsWith("sync/upstream-"));
 if (
 	!shouldOpenSyncPr({
 		openConflictIssues: conflictIssues.length,
-		openMigrationSyncPrs: migrationPrs.length,
+		openSyncPrs: syncPrs.length,
 	})
 ) {
 	console.log(
-		`waiting: ${conflictIssues.length} open conflict issue(s), ${migrationPrs.length} open migration sync PR(s)`,
+		`waiting: ${conflictIssues.length} open conflict issue(s), ${syncPrs.length} open sync PR(s)`,
 	);
 	process.exit(0);
 }
@@ -158,3 +166,6 @@ if (pr.autoMerge) {
 	await $`gh pr merge ${url} --repo ${repo} --auto --merge`;
 	console.log("auto-merge armed");
 }
+
+// The PR itself can start pull_request runs of upstream workflows; cancel them.
+await disableInheritedWorkflows({ repo, dryRun: false, waitMs: 0 });

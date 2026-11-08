@@ -88,7 +88,7 @@ Workflow `smg-sync.yml`, scheduled daily at 07:00 UTC (night in the Americas) pl
 3. **No conflict:** open a PR into `smg` titled `Sync upstream <date> (<n> commits)` with the upstream commit list, enable auto-merge. CI runs (section 8); when green it merges and deploys in the same window.
 4. **Conflict:** open an **issue** labeled `upstream-conflict` (a PR with no diff cannot be opened) listing the conflicting files and the `smg` commits that touched each. A developer resolves it on a `sync/upstream-*` branch and opens the PR. Later syncs keep `main` current but open no new sync PR until the issue is closed, so conflicts never stack.
 5. If there are no new upstream commits, do nothing.
-6. **Migration gate:** if the sync adds files under `packages/database/migrations/**`, the PR gets label `has-migrations` and no auto-merge. A developer reads the migrations, takes a MySQL backup, and merges by hand. Migrations run on server start and before the healthcheck, so rolling back the image digest does not roll back the schema. *(Builder call.)*
+6. **Migration gate:** if the sync adds files under `packages/database/migrations/**`, the PR gets label `has-migrations` and no auto-merge. A developer reads the migrations, takes a MySQL backup, adds the `migrations-approved` label and merges by hand. The same gate applies to every PR into `smg`, not only syncs: a `feat/*` branch cut from a newer `main`, or a conflict fix, can also bring upstream migrations (the `migrations` check in `smg-ci`). Migrations run on server start and before the healthcheck, so rolling back the image digest does not roll back the schema. *(Builder call.)*
 
 Developers should enable `git config rerere.enabled true` locally so a resolved conflict is reused if it reappears.
 
@@ -105,7 +105,10 @@ Two cases need a human, and the sync PR surfaces both as a conflict:
 **`smg-ci.yml`**: on PRs into `smg`, on `ubuntu-latest`, with path filters so desktop-only changes skip it:
 - `bun install --frozen-lockfile`, Biome check, typecheck and unit tests for `apps/web` (and `apps/media-server` when touched).
 - Docker build of `apps/web/Dockerfile` without pushing, to catch build breaks before merge.
-These are the required checks on `smg`.
+- `migrations`: fails while the PR brings migrations and lacks the `migrations-approved` label.
+- `ci-ok`: one aggregate job that fails if any job above failed or was cancelled. It is the **only** required check: a skipped job counts as passing, so requiring the individual jobs would let a PR merge untested when the change-detection job itself fails.
+
+One sync PR at a time: while a sync PR is open (pending, red or held for migrations), the next sync keeps `main` current but opens no new PR.
 
 **`smg-deploy.yml`**: on push to `smg` (and manual dispatch with an optional commit or digest for rollback):
 1. Build `apps/web/Dockerfile` for `linux/amd64` only (Railway's platform), with Actions cache. Push `ghcr.io/solomedia/cap-web:smg-<shortsha>` (immutable) and `:smg` (moving). Media server stays on the official image in the first version (section 2).
@@ -140,7 +143,7 @@ A table in `SMG.md` with one row per carried change: branch, type (A or B), upst
 ## 11. Access and secrets
 
 - **Sync bot:** a GitHub App installed on `Solomedia/cap` with contents and pull-request write, so its pushes and PRs trigger CI. It is the only actor allowed to update `main`.
-- **`RAILWAY_TOKEN`:** a Railway project token for "SMG - CAP" production, stored as a GitHub Actions secret, used only by `smg-deploy`.
+- **`RAILWAY_TOKEN`:** a Railway project token for "SMG - CAP" production, stored in a GitHub **`production` environment** whose deployment branches are limited to `smg`, so no other branch's workflow can read it. Both `smg-deploy` jobs also refuse to run outside `refs/heads/smg`.
 - **GHCR:** the `cap-web` package is public (the source is public under AGPL), so Railway pulls without registry credentials.
 - Railway's image auto-updates on Cap Web are turned off when Cap Web moves to our image: our pipeline is the only thing that changes the image.
 

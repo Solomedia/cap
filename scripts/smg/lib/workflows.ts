@@ -22,3 +22,12 @@ export function workflowsToDisable(
 		)
 		.map(({ id, path }) => ({ id, path }));
 }
+
+// Upstream workflows added by a push only show up in the API once GitHub has registered them.
+export function missingWorkflows(
+	expected: string[],
+	listed: { path: string }[],
+): string[] {
+	const known = new Set(listed.map((w) => w.path));
+	return expected.filter((path) => !isSmgWorkflow(path) && !known.has(path));
+}

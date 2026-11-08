@@ -1,18 +1,40 @@
 import { parseArgs } from "node:util";
 import { $ } from "bun";
-import { workflowsToDisable } from "./lib/workflows.ts";
+import { missingWorkflows, workflowsToDisable } from "./lib/workflows.ts";
 
 type WorkflowsPage = {
 	workflows: { id: number; path: string; state: string }[];
 };
 
+const listWorkflows = async (repo: string) =>
+	(
+		(await $`gh api repos/${repo}/actions/workflows --paginate --slurp`.json()) as WorkflowsPage[]
+	).flatMap((page) => page.workflows);
+
+// `waitFor`: workflow paths a push just added. GitHub registers them
+// asynchronously, so poll until they are listed (or the wait runs out).
 export async function disableInheritedWorkflows(input: {
 	repo: string;
 	dryRun: boolean;
+	waitFor?: string[];
+	waitMs?: number;
 }): Promise<{ disabled: string[]; cancelledRuns: number }> {
-	const pages =
-		(await $`gh api repos/${input.repo}/actions/workflows --paginate --slurp`.json()) as WorkflowsPage[];
-	const targets = workflowsToDisable(pages.flatMap((page) => page.workflows));
+	let workflows = await listWorkflows(input.repo);
+	const deadline = Date.now() + (input.waitMs ?? 90_000);
+	while (
+		missingWorkflows(input.waitFor ?? [], workflows).length > 0 &&
+		Date.now() < deadline
+	) {
+		await Bun.sleep(5_000);
+		workflows = await listWorkflows(input.repo);
+	}
+	const stillMissing = missingWorkflows(input.waitFor ?? [], workflows);
+	if (stillMissing.length > 0) {
+		console.log(
+			`not registered yet, next sync disables them: ${stillMissing.join(", ")}`,
+		);
+	}
+	const targets = workflowsToDisable(workflows);
 	const disabled: string[] = [];
 	let cancelledRuns = 0;
 
