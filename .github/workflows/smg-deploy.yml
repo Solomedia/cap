@@ -63,6 +63,8 @@ jobs:
           file: apps/web/Dockerfile
           platforms: linux/amd64
           push: true
+          # A plain image manifest, no attestation index, so Railway pulls exactly this digest.
+          provenance: false
           tags: |
             ${{ env.IMAGE }}:smg-${{ steps.sha.outputs.short }}
             ${{ env.IMAGE }}:smg
