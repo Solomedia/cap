@@ -10,6 +10,9 @@ export const LABELS = {
 
 export const DIVERGED_ISSUE_TITLE = "main diverged from upstream";
 
+// Keeps the PR body well under GitHub's 65,536-character limit.
+const MAX_LISTED_COMMITS = 200;
+
 export function mirrorAction(input: {
 	originMain: string;
 	upstreamMain: string;
@@ -69,8 +72,13 @@ export function buildSyncPr(input: {
 	lines.push(
 		"## Upstream commits",
 		"",
-		...input.commits.map((c) => `- ${c.sha} ${c.subject}`),
+		...input.commits
+			.slice(0, MAX_LISTED_COMMITS)
+			.map((c) => `- ${c.sha} ${c.subject}`),
 	);
+	if (count > MAX_LISTED_COMMITS) {
+		lines.push(`- …and ${count - MAX_LISTED_COMMITS} more`);
+	}
 	return {
 		title: `Sync upstream ${branchDate(input.branch)} (${count} ${count === 1 ? "commit" : "commits"})`,
 		body: lines.join("\n"),

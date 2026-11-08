@@ -122,6 +122,24 @@ describe("buildSyncPr", () => {
 	});
 });
 
+describe("buildSyncPr with a large sync", () => {
+	test("lists the first 200 commits and counts the rest", () => {
+		const many = Array.from({ length: 250 }, (_, i) => ({
+			sha: `s${i}`,
+			subject: `c${i}`,
+		}));
+		const pr = buildSyncPr({
+			branch: "sync/upstream-20261108-0700",
+			commits: many,
+			migrations: [],
+		});
+		expect(pr.title).toBe("Sync upstream 2026-11-08 (250 commits)");
+		expect(pr.body).toContain("- s199 c199");
+		expect(pr.body).not.toContain("- s200 c200");
+		expect(pr.body).toContain("and 50 more");
+	});
+});
+
 describe("buildConflictIssue", () => {
 	test("lists each conflicting file with the smg commits that touched it", () => {
 		const issue = buildConflictIssue({
