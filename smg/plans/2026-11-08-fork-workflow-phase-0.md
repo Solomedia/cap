@@ -15,7 +15,7 @@
 - Repo `Solomedia/cap`; upstream `CapSoftware/Cap`. Work on branch `internal/fork-workflow` cut from `origin/smg`; PR into `smg`, squash merge. Never commit to `main`.
 - SMG-owned paths only: `SMG.md`, `smg/**`, `.github/workflows/smg-*.yml`, `scripts/smg/**`. Do not edit any upstream file, including upstream workflows and `.github/actions/*` (using `./.github/actions/setup-js` is fine).
 - Commits and PR text in English, no AI attribution of any kind, commits signed with the developer's local config. No force pushes.
-- Package manager `bun@1.4.4`. Tests: `bun test scripts/smg`. Typecheck: `bun run tsc --noEmit --strict --allowImportingTsExtensions --target ESNext --module ESNext --moduleResolution bundler --resolveJsonModule --types bun --skipLibCheck scripts/smg/**/*.ts` (same flags upstream uses for `scripts/loops`).
+- Package manager `bun@1.4.4`. Tests: `bun test scripts/smg`. Typecheck: `bun run tsc -p scripts/smg` (`scripts/smg/tsconfig.json` holds the same flags upstream uses for `scripts/loops`).
 - Format touched files with Biome 2.2.0: `bunx @biomejs/biome@2.2.0 check --write <files>`.
 - Sync schedule `0 7 * * *` (07:00 UTC). Sync branch name `sync/upstream-<YYYYMMDD-HHMM>` (UTC).
 - Labels: `upstream-sync`, `upstream-conflict`, `has-migrations`.

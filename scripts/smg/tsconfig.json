@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+		"noEmit": true,
+		"strict": true,
+		"allowImportingTsExtensions": true,
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"resolveJsonModule": true,
+		"types": ["bun"],
+		"skipLibCheck": true
+	},
+	"include": ["**/*.ts"]
+}
