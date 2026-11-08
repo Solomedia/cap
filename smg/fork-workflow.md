@@ -83,6 +83,8 @@ Not in git history beyond documentation. Changed through Railway or repository v
 
 Workflow `smg-sync.yml`, scheduled daily at 07:00 UTC (night in the Americas) plus manual dispatch.
 
+Until the sync bot exists (decided by Hildegar, 2026-11-08: not created yet), the workflow stays off behind `SMG_BOT_ENABLED` and Hildegar runs `scripts/smg/sync.ts` by hand once a week with Hildegar's own `gh` login, first with `--dry-run`. The steps below are the same either way. A personal token triggers CI on the sync PR, which the default `GITHUB_TOKEN` would not.
+
 1. Fast-forward `main` to `CapSoftware/Cap:main` with a plain `git push` (never `--force`) as the sync bot. GitHub's "sync fork" API is not used: when the fork has extra commits it can write a merge commit into `main`. If `main` cannot fast-forward, someone committed to it: open an issue and stop.
 2. Create `sync/upstream-<date>` from `smg`, run `git merge main`.
 3. **No conflict:** open a PR into `smg` titled `Sync upstream <date> (<n> commits)` with the upstream commit list, enable auto-merge. CI runs (section 8); when green it merges and deploys in the same window.

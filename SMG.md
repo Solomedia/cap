@@ -23,6 +23,17 @@ Flow for every improvement:
 4. Open the PR against `CapSoftware/Cap:main` from the same branch, following their conventions (Biome formatting, tests next to the change).
 5. Address review with new commits, and keep it current by merging `main` into it. When upstream merges it, the next sync brings the same commits and our copy disappears with no extra work.
 
+## Weekly sync (manual, until the sync bot exists)
+
+The scheduled `SMG Sync` workflow stays off until the "SMG Cap Bot" GitHub App is created and `SMG_BOT_ENABLED=true` is set. Until then, run the same script by hand once a week from a clone with `origin` = `Solomedia/cap` and `upstream` = `CapSoftware/Cap`:
+
+```bash
+GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap --dry-run
+GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap
+```
+
+The first command only prints what would happen. The second one fast-forwards `main`, turns off any new upstream workflow, and opens the sync PR into `smg` (auto-merge on green CI, or held when it brings migrations). It uses a temporary worktree, so your checkout and branch are not touched.
+
 ## Patch ledger
 
 What we carry on top of upstream. `git log --first-parent --oneline main..smg` is the source of truth; this table is the readable view.

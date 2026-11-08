@@ -181,13 +181,13 @@
 Settings marked **(Hildegar)** need the GitHub UI or an owner account; the rest are `gh` commands to run after Hildegar approves them in chat.
 
 - [ ] **Step 1:** Push `internal/fork-workflow` and open a PR into `smg` titled `Add SMG fork workflow: sync, CI and image pipeline` (English, no AI attribution). Wait for review.
-- [ ] **Step 2 (Hildegar):** Create GitHub App "SMG Cap Bot" in the Solomedia org with repository permissions Contents RW, Pull requests RW, Issues RW, Workflows RW, Actions RW; install it on `Solomedia/cap` only; store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY` as Actions secrets.
+- [ ] **Step 2 (Hildegar, deferred on 2026-11-08):** Not now: syncs run by hand weekly (`SMG.md`, "Weekly sync"). When created, also set `SMG_BOT_ENABLED=true`. Create GitHub App "SMG Cap Bot" in the Solomedia org with repository permissions Contents RW, Pull requests RW, Issues RW, Workflows RW, Actions RW; install it on `Solomedia/cap` only; store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY` as Actions secrets.
 - [ ] **Step 3:** `gh variable set SMG_DEPLOY_FREEZE --body true --repo Solomedia/cap`, plus `RAILWAY_PROJECT_ID=d280f647-7fe5-4bd2-b5f7-2c1826711eaf`, `RAILWAY_ENVIRONMENT_ID` and `RAILWAY_CAP_WEB_SERVICE_ID` with the values in Global Constraints.
-- [ ] **Step 4:** `gh repo edit Solomedia/cap --enable-auto-merge --enable-merge-commit --enable-squash-merge --delete-branch-on-merge`
+- [ ] **Step 4:** `gh repo edit Solomedia/cap --enable-issues --enable-auto-merge --enable-merge-commit --enable-squash-merge --delete-branch-on-merge`
 - [ ] **Step 5:** Squash-merge the PR into `smg`. Then `gh repo edit Solomedia/cap --default-branch smg` (scheduled workflows only run from the default branch).
 - [ ] **Step 6:** `GH_TOKEN=$(gh auth token) bun scripts/smg/disable-workflows.ts --repo Solomedia/cap` → every non-`smg-*` workflow shows `disabled_manually` in `gh workflow list --all`.
 - [ ] **Step 7:** Rulesets via `gh api repos/Solomedia/cap/rulesets`:
-  - `main`: block deletion and non-fast-forward; restrict updates with the SMG Cap Bot app as the only bypass actor.
+  - `main`: block deletion and non-fast-forward. Until the bot exists, repository admins may update it (the weekly manual sync pushes as Hildegar); then restrict updates to the SMG Cap Bot app.
   - `smg`: block deletion and non-fast-forward; require a pull request (0 approvals); required status check `ci-ok`, pinned to the GitHub Actions app.
   - Environment `production` with deployment branches limited to `smg` (Phase 1 stores `RAILWAY_TOKEN` there).
   - Label `migrations-approved`; default `GITHUB_TOKEN` workflow permissions set to read-only.
@@ -195,7 +195,7 @@ Settings marked **(Hildegar)** need the GitHub UI or an owner account; the rest 
 
 ### Task 8: End-to-end check
 
-- [ ] **Step 1:** `gh workflow run smg-sync.yml --repo Solomedia/cap`, then `gh run watch`. Expected: either "smg already contains main", or a `sync/upstream-*` PR with label `upstream-sync`, a `SMG CI` run, and auto-merge armed (or `has-migrations` and no auto-merge).
+- [ ] **Step 1:** Until the bot exists: `GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap` (after a `--dry-run`). With the bot: `gh workflow run smg-sync.yml --repo Solomedia/cap`, then `gh run watch`. Expected: either "smg already contains main", or a `sync/upstream-*` PR with label `upstream-sync`, a `SMG CI` run, and auto-merge armed (or `has-migrations` and no auto-merge).
 - [ ] **Step 2:** After a sync PR merges, `SMG Deploy` runs: `build` pushes `ghcr.io/solomedia/cap-web:smg-<sha>`, and `deploy` ends with "Deploy frozen (SMG_DEPLOY_FREEZE)". Railway Cap Web is unchanged (`get-service-config` still shows the `ghcr.io/capsoftware/cap-web@sha256:e2dbc1e8…` image).
 - [ ] **Step 3 (Hildegar):** In the org's Packages settings, make `cap-web` public so Railway can pull it without credentials.
 - [ ] **Step 4:** Update the Patch ledger in `SMG.md` if anything changed, and post the results (sync PR link, deploy run link, image digest) in the team channel.

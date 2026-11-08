@@ -15,6 +15,9 @@ permissions:
 jobs:
   sync:
     name: sync
+    # Off until the "SMG Cap Bot" app exists. Meanwhile run the sync by hand
+    # weekly (see SMG.md, "Weekly sync"); set SMG_BOT_ENABLED=true to turn this on.
+    if: vars.SMG_BOT_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Create bot token
