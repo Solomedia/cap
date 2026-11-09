@@ -25,6 +25,8 @@ export type ShareVideoMetadataInput = {
 	 */
 	canonicalWebUrl?: string;
 	advertiseIframelyPlayer?: boolean;
+	/** Link preview text, eg. the AI summary. Falls back to a generic line. */
+	description?: string | null;
 };
 
 export const getShareVideoUrls = ({
@@ -83,6 +85,7 @@ export const buildShareVideoMetadata = ({
 	advertiseIframelyPlayer = false,
 	width,
 	height,
+	description: customDescription,
 }: ShareVideoMetadataInput): Metadata => {
 	const urls = getShareVideoUrls({
 		videoId,
@@ -91,7 +94,7 @@ export const buildShareVideoMetadata = ({
 		canonicalWebUrl,
 	});
 	const title = `${name} | Cap Recording`;
-	const description = "Watch this video on Cap";
+	const description = customDescription || "Watch this video on Cap";
 	const hasDimensions =
 		width != null && height != null && width > 0 && height > 0;
 	const playerWidth = hasDimensions ? width : PLAYER_WIDTH;

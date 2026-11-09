@@ -181,4 +181,38 @@ describe("share video metadata", () => {
 			}
 		},
 	);
+
+	it("uses the given description in the page, Open Graph and Twitter metadata", () => {
+		const metadata = buildShareVideoMetadata({
+			videoId: "video123",
+			name: "Product demo",
+			sourceType: "desktopMP4",
+			webUrl: "https://cap.so",
+			width: null,
+			height: null,
+			description: "Walkthrough of the new billing flow.",
+		});
+
+		expect(metadata.description).toBe("Walkthrough of the new billing flow.");
+		expect(metadata.openGraph?.description).toBe(
+			"Walkthrough of the new billing flow.",
+		);
+		expect(metadata.twitter?.description).toBe(
+			"Walkthrough of the new billing flow.",
+		);
+	});
+
+	it("falls back to the generic description without one", () => {
+		const metadata = buildShareVideoMetadata({
+			videoId: "video123",
+			name: "Product demo",
+			sourceType: "desktopMP4",
+			webUrl: "https://cap.so",
+			width: null,
+			height: null,
+			description: null,
+		});
+
+		expect(metadata.description).toBe("Watch this video on Cap");
+	});
 });
