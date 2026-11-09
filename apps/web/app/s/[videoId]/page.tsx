@@ -67,6 +67,7 @@ import {
 	canStartPlaybackInHtml,
 	getSharePlaybackSource,
 } from "@/lib/share-playback";
+import { getShareUnfurlDescription } from "@/lib/share-unfurl-description";
 import { buildShareVideoMetadata } from "@/lib/share-video-metadata";
 import {
 	resolveForeignShareRedirect,
@@ -302,33 +303,45 @@ export async function generateMetadata(
 	).toString();
 
 	return Effect.flatMap(Videos, (v) => v.getByIdForViewing(videoId)).pipe(
-		Effect.map(
+		Effect.flatMap(
 			Option.match({
 				onNone: () =>
-					awaitRecording
-						? {
-								title: "Cap: Preparing Video",
-								description: "This recording is being made available.",
-								robots: "noindex, nofollow",
-							}
-						: notFound(),
-				onSome: ([video]) => {
-					return {
-						...buildShareVideoMetadata({
-							videoId,
-							name: video.name,
-							sourceType: video.source.type,
-							width: Option.getOrNull(video.width),
-							height: Option.getOrNull(video.height),
-							webUrl,
-							canonicalWebUrl: buildEnv.NEXT_PUBLIC_WEB_URL,
-							advertiseIframelyPlayer: shouldAdvertiseIframelyPlayer,
-						}),
-						robots: canRenderSocialPreview
-							? "index, follow"
-							: "noindex, nofollow",
-					};
-				},
+					Effect.sync(
+						(): Metadata =>
+							awaitRecording
+								? {
+										title: "Cap: Preparing Video",
+										description: "This recording is being made available.",
+										robots: "noindex, nofollow",
+									}
+								: notFound(),
+					),
+				onSome: ([video]) =>
+					Effect.promise(() =>
+						getShareUnfurlDescription(
+							video.id,
+							Option.getOrUndefined(video.metadata),
+						),
+					).pipe(
+						Effect.map(
+							(description): Metadata => ({
+								...buildShareVideoMetadata({
+									videoId,
+									name: video.name,
+									sourceType: video.source.type,
+									width: Option.getOrNull(video.width),
+									height: Option.getOrNull(video.height),
+									webUrl,
+									canonicalWebUrl: buildEnv.NEXT_PUBLIC_WEB_URL,
+									advertiseIframelyPlayer: shouldAdvertiseIframelyPlayer,
+									description,
+								}),
+								robots: canRenderSocialPreview
+									? "index, follow"
+									: "noindex, nofollow",
+							}),
+						),
+					),
 			}),
 		),
 		Effect.catchTags({
