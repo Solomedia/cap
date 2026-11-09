@@ -1,5 +1,4 @@
-# syntax=docker.io/docker/dockerfile:1
-# Generated from apps/web/Dockerfile for Railway: only cache mount ids differ.
+# Generated from apps/web/Dockerfile for Railway: no syntax directive, Railway cache mount ids.
 # Do not edit. Regenerate with: bun scripts/smg/railway-dockerfile.ts --write
 
 FROM oven/bun:1.4.4-alpine AS bun
