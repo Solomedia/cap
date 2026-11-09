@@ -97,11 +97,9 @@ Related upstream threads worth following:
 
 ## Still to set up
 
-Phase 0 (sync and CI) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, the rulesets are active (`ci-ok` is the required check on `smg`; `feat/*` branches can't be deleted), the `production` environment only accepts `smg`, and every inherited workflow is disabled. On 2026-11-09 the GHCR image pipeline was replaced by Railway building from GitHub, with its config in `.railway/railway.ts`.
+Phase 0 (sync and CI) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, the rulesets are active (`ci-ok` is the required check on `smg`; `feat/*` branches can't be deleted), the `production` environment only accepts `smg`, and every inherited workflow is disabled. On 2026-11-09 the GHCR image pipeline was replaced by Railway building from GitHub, with its config in `.railway/railway.ts`. Cap Web runs our `smg` build since that day ([#7](https://github.com/Solomedia/cap/pull/7), [#8](https://github.com/Solomedia/cap/pull/8)); migration `0052_directory_sync` ran on that first deploy, after a MySQL backup. To go back to the official image, redeploy deployment `b11bf293` from the Railway dashboard (official `cap-web@sha256:e2dbc1e8…`).
 
 Left to do:
 
 - **Sync bot.** Create the GitHub App, store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY`, then set `SMG_BOT_ENABLED=true`. Until then the sync runs by hand (see "Weekly sync").
-- **`RAILWAY_TOKEN`.** A Railway project token for the `production` environment, stored as a repository secret. The plan and apply workflows need it.
-- **Cutover.** Merge the PR that switches Cap Web's source in `.railway/railway.ts` from the official image to `github("Solomedia/cap", { branch: "smg" })` with Wait for CI, during a maintenance window: MySQL backup first, Loom import paused and drained, and the official image digest `e2dbc1e8…` kept for rollback. The first deploy runs migration `0052_directory_sync`.
-- **AI**, after the 2021–2024 Loom import: add the AI variables to Cap Web in Railway.
+- **AI.** The Loom import finished on 2026-11-09 (25,465 imported, 203 failed). Add the AI variables to Cap Web in Railway.
