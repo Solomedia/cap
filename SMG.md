@@ -6,19 +6,43 @@ Our goal is to stay current with upstream and carry as few patches as possible. 
 
 ## Branches
 
+Full workflow: [smg/fork-workflow.md](smg/fork-workflow.md).
+
 | Branch | Purpose | Rules |
 | --- | --- | --- |
-| `main` | Exact mirror of `CapSoftware/Cap:main` | Never commit here. Synced from upstream only. |
-| `smg` | `main` + our patches. Production images build from here. | Changes land through PRs from `feat/*`. Rebased on `main` after each upstream sync. |
-| `feat/<topic>` | One improvement each | Branched from `main` (not `smg`) so the same branch can open a PR against upstream. |
+| `main` | Exact mirror of `CapSoftware/Cap:main` | Never commit here. Fast-forwarded from upstream by the sync bot only. |
+| `smg` | `main` + our patches. Production images build from here. Default branch. | Changes land through PRs. Updated by merging `main`, never rebased. |
+| `feat/<topic>` | One upstream-able improvement | Branched from `main` (not `smg`) so the same branch can open a PR against upstream. Merged into `smg` with a merge commit, never rebased afterwards. |
+| `internal/<topic>` | One SMG-only change | Branched from `smg`, squash-merged into `smg`. Not `smg/<topic>`: git cannot hold `smg/…` next to a branch named `smg`. |
 
 Flow for every improvement:
 
 1. Branch `feat/<topic>` from an up-to-date `main`.
 2. Put new behavior behind an environment variable or a self-hosting check, so upstream's hosted product is unaffected by default.
-3. Open the PR against `CapSoftware/Cap:main`, following their conventions (Biome formatting, tests next to the change).
-4. Merge the same branch into `smg` so we can use it before upstream reviews it.
-5. When upstream merges, delete the patch from `smg` on the next rebase.
+3. Open a PR into `smg` (merge commit) so we can use it before upstream reviews it.
+4. Open the PR against `CapSoftware/Cap:main` from the same branch, following their conventions (Biome formatting, tests next to the change).
+5. Address review with new commits, and keep it current by merging `main` into it. When upstream merges it, the next sync brings the same commits and our copy disappears with no extra work.
+
+## Weekly sync (manual, until the sync bot exists)
+
+The scheduled `SMG Sync` workflow stays off until the "SMG Cap Bot" GitHub App is created and `SMG_BOT_ENABLED=true` is set. Until then, run the same script by hand once a week from a clone with `origin` = `Solomedia/cap` and `upstream` = `CapSoftware/Cap`:
+
+```bash
+GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap --dry-run
+GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap
+```
+
+The first command only prints what would happen. The second one fast-forwards `main`, turns off any new upstream workflow, and opens the sync PR into `smg` (auto-merge on green CI, or held when it brings migrations). It uses a temporary worktree, so your checkout and branch are not touched.
+
+## Patch ledger
+
+What we carry on top of upstream. `git log --first-parent --oneline main..smg` is the source of truth; this table is the readable view.
+
+| Branch | Type | Upstream PR | State | Upstream files touched |
+| --- | --- | --- | --- | --- |
+| `feat/members-table-search` | A | [CapSoftware/Cap#3919](https://github.com/CapSoftware/Cap/pull/3919) | PR open (not in smg) | `apps/web/app/(org)/dashboard/settings/organization/components/MembersCard.tsx`, `apps/web/content/docs/teams.mdx` |
+
+Type A: upstream-able (`feat/*`). Type B: SMG-only (`internal/*`). States: `In smg`, `PR open`, `Merged upstream`, `Rejected upstream → SMG-only`.
 
 ## Scope
 
@@ -63,6 +87,4 @@ Related upstream threads worth following:
 
 ## Still to set up
 
-- Scheduled sync of `main` from upstream, and a rebase of `smg` that opens an issue on conflict.
-- Image build to GHCR on our own schedule. Upstream publishes by hand, so even with zero patches this keeps us on the latest fixes.
-- GitHub Actions are disabled by default on forks; enable them when the workflows land.
+Phase 0 (sync, CI, image build, deploys frozen): [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md).
