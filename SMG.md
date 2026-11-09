@@ -39,7 +39,8 @@ The first command only prints what would happen. The second one fast-forwards `m
 Cap Web's Railway settings live in [`.railway/railway.ts`](.railway/railway.ts) as Railway Infrastructure as Code (not the deprecated `railway.json`). It is a partial that owns only Cap Web; MySQL, Cap Media Server, Cap Loom Importer and `cap-admin-library-sync` stay in the dashboard. Variables and secrets are not in the file: they stay in Railway.
 
 - **Config changes** go through a PR that touches `.railway/`. `SMG Railway plan` comments the plan on the PR; merging applies that exact plan (`SMG Railway apply`). Preview locally with `railway config plan` from a linked checkout.
-- **Code changes** deploy when they reach `smg`. Railway builds `apps/web/Dockerfile` from `smg` and waits for the `SMG CI` run on that push ("Wait for CI"): if it fails, that commit is not deployed.
+- **Code changes** deploy when they reach `smg`. Railway builds `smg/web.Dockerfile` from `smg` and waits for the `SMG CI` run on that push ("Wait for CI"): if it fails, that commit is not deployed.
+- **`smg/web.Dockerfile`** is `apps/web/Dockerfile` with the cache mount ids Railway requires (`s/<service id>-<path>`); we don't patch upstream's file. When a sync changes upstream's Dockerfile, the `scripts` check fails until you run `bun scripts/smg/railway-dockerfile.ts --write` on the sync branch and commit the result.
 - **Migrations** run when Cap Web starts, and a rollback doesn't undo them. That is why a PR that adds one needs the `migrations-approved` label, given after a MySQL backup.
 - **To pause deploys**, turn off the GitHub autodeploy on Cap Web in Railway. To roll back, redeploy an earlier deployment from the Railway dashboard.
 
@@ -102,5 +103,5 @@ Left to do:
 
 - **Sync bot.** Create the GitHub App, store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY`, then set `SMG_BOT_ENABLED=true`. Until then the sync runs by hand (see "Weekly sync").
 - **`RAILWAY_TOKEN`.** A Railway project token for the `production` environment, stored as a repository secret. The plan and apply workflows need it.
-- **Cutover.** Switch Cap Web's source in `.railway/railway.ts` from the official image to `github("Solomedia/cap", { branch: "smg" })` with Wait for CI, in a PR merged during a maintenance window: MySQL backup first, Loom import paused, and the official image digest kept for rollback. The first deploy runs migration `0052_directory_sync`.
+- **Cutover.** Merge the PR that switches Cap Web's source in `.railway/railway.ts` from the official image to `github("Solomedia/cap", { branch: "smg" })` with Wait for CI, during a maintenance window: MySQL backup first, Loom import paused and drained, and the official image digest `e2dbc1e8…` kept for rollback. The first deploy runs migration `0052_directory_sync`.
 - **AI**, after the 2021–2024 Loom import: add the AI variables to Cap Web in Railway.
