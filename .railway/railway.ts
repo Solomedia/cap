@@ -6,7 +6,7 @@
 // a partial never deletes resources it doesn't own.
 //
 // Variables are unmanaged: secrets and env live in Railway, never in this file.
-import { defineRailway, group, image, project, service } from "railway/iac";
+import { defineRailway, github, group, project, service } from "railway/iac";
 
 export const partial = "cap-web";
 
@@ -18,11 +18,28 @@ const everyDay = [0, 1, 2, 3, 4, 5, 6].map((day) => ({
 
 export default defineRailway(() => {
 	const capWeb = service("Cap Web", {
-		source: image(
-			"ghcr.io/capsoftware/cap-web@sha256:e2dbc1e802011c46190c8de19ced866ae43b9dfb23946d49203b368a8cd81719",
-			{ autoUpdates: { type: "patch", schedule: everyDay } },
-		),
-		build: { buildEnvironment: "V3", builder: "RAILPACK" },
+		// Built from smg. checkSuites is Railway's "Wait for CI": a commit deploys
+		// only after the workflows on its push (SMG CI) succeed.
+		source: github("Solomedia/cap", { branch: "smg", checkSuites: true }),
+		build: {
+			builder: "DOCKERFILE",
+			// apps/web/Dockerfile with Railway's cache mount ids
+			// (scripts/smg/lib/railway-dockerfile.ts keeps it in step).
+			dockerfilePath: "smg/web.Dockerfile",
+			buildEnvironment: "V3",
+			// Rebuild only when something the web image uses changes.
+			watchPatterns: [
+				"/apps/web/**",
+				"/smg/web.Dockerfile",
+				"/packages/**",
+				"/patches/**",
+				"/package.json",
+				"/bun.lock",
+				"/bunfig.toml",
+				"/turbo.json",
+				"/tsconfig.json",
+			],
+		},
 		healthcheck: "/api/status",
 		healthcheckTimeout: 120,
 		replicas: { "us-west2": 1 },
