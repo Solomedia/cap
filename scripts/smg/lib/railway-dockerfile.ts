@@ -1,10 +1,11 @@
-// Railway only accepts BuildKit cache mounts whose id is `s/<service id>-<target>`.
-// Upstream's apps/web/Dockerfile uses its own ids, so Railway builds a generated
-// copy (smg/web.Dockerfile) instead of us patching upstream's file.
+// Railway only accepts BuildKit cache mounts whose id is `s/<service id>-<target>`,
+// and rejects `# syntax=` directives (external Dockerfile frontends). Upstream's
+// apps/web/Dockerfile has both, so Railway builds a generated copy
+// (smg/web.Dockerfile) instead of us patching upstream's file.
 
 export const CAP_WEB_SERVICE_ID = "3035d845-1a7e-43c5-8c15-c61db41ff384";
 
-const HEADER = `# Generated from apps/web/Dockerfile for Railway: only cache mount ids differ.
+const HEADER = `# Generated from apps/web/Dockerfile for Railway: no syntax directive, Railway cache mount ids.
 # Do not edit. Regenerate with: bun scripts/smg/railway-dockerfile.ts --write
 `;
 
@@ -26,10 +27,6 @@ export function railwayDockerfile(
 		/--mount=(type=cache[^\s]*)/g,
 		(_, options: string) => `--mount=${railwayMount(options, serviceId)}`,
 	);
-	// A `# syntax=` directive only works on the first line.
-	const [first, ...rest] = body.split("\n");
-	if (first?.startsWith("# syntax=")) {
-		return `${first}\n${HEADER}${rest.join("\n")}`;
-	}
-	return `${HEADER}${body}`;
+	const withoutSyntax = body.replace(/^# syntax=[^\n]*\n/, "");
+	return `${HEADER}${withoutSyntax}`;
 }

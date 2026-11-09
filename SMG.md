@@ -40,7 +40,7 @@ Cap Web's Railway settings live in [`.railway/railway.ts`](.railway/railway.ts) 
 
 - **Config changes** go through a PR that touches `.railway/`. `SMG Railway plan` comments the plan on the PR; merging applies that exact plan (`SMG Railway apply`). Preview locally with `railway config plan` from a linked checkout.
 - **Code changes** deploy when they reach `smg`. Railway builds `smg/web.Dockerfile` from `smg` and waits for the `SMG CI` run on that push ("Wait for CI"): if it fails, that commit is not deployed.
-- **`smg/web.Dockerfile`** is `apps/web/Dockerfile` with the cache mount ids Railway requires (`s/<service id>-<path>`); we don't patch upstream's file. When a sync changes upstream's Dockerfile, the `scripts` check fails until you run `bun scripts/smg/railway-dockerfile.ts --write` on the sync branch and commit the result.
+- **`smg/web.Dockerfile`** is `apps/web/Dockerfile` without the `# syntax=` line (Railway rejects external Dockerfile frontends) and with the cache mount ids Railway requires (`s/<service id>-<path>`); we don't patch upstream's file. When a sync changes upstream's Dockerfile, the `scripts` check fails until you run `bun scripts/smg/railway-dockerfile.ts --write` on the sync branch and commit the result.
 - **Migrations** run when Cap Web starts, and a rollback doesn't undo them. That is why a PR that adds one needs the `migrations-approved` label, given after a MySQL backup.
 - **To pause deploys**, turn off the GitHub autodeploy on Cap Web in Railway. To roll back, redeploy an earlier deployment from the Railway dashboard.
 

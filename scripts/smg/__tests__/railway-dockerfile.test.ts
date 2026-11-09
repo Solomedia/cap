@@ -27,12 +27,15 @@ describe("railwayDockerfile", () => {
 		);
 	});
 
-	test("keeps the syntax directive first, then says how to regenerate", () => {
+	// Railway's builder rejects external Dockerfile frontends; the built-in one
+	// already supports cache mounts.
+	test("drops the syntax directive and starts with how to regenerate", () => {
 		const out = railwayDockerfile(
 			"# syntax=docker.io/docker/dockerfile:1\nFROM node\n",
 		);
+		expect(out).not.toContain("# syntax=");
 		expect(out).toMatch(
-			/^# syntax=docker\.io\/docker\/dockerfile:1\n# Generated from apps\/web\/Dockerfile.*bun scripts\/smg\/railway-dockerfile.ts --write\n/s,
+			/^# Generated from apps\/web\/Dockerfile.*bun scripts\/smg\/railway-dockerfile.ts --write\nFROM node\n$/s,
 		);
 	});
 
