@@ -1,0 +1,35 @@
+name: SMG Railway apply
+
+# Applies the plan pinned on the merged PR (smg-railway-plan.yml). It never
+# re-evaluates .railway/railway.ts: if Railway changed since the plan, or the
+# merged .railway/ tree is not the planned one, it fails and the PR is re-planned.
+
+on:
+  push:
+    branches: [smg]
+    paths: [".railway/**"]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: smg-railway-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: railway apply
+    if: github.ref == 'refs/heads/smg'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply the pinned plan
+        uses: railwayapp/config@f1f0c715716fe035319b0a716b95c6e83e0f6595 # main 2026-10-13, after v1.2.0: adds package-manager
+        with:
+          command: apply
+          railway-token: ${{ secrets.RAILWAY_TOKEN }}
