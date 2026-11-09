@@ -12,7 +12,7 @@ Full workflow: [smg/fork-workflow.md](smg/fork-workflow.md).
 | --- | --- | --- |
 | `main` | Exact mirror of `CapSoftware/Cap:main` | Never commit here. Fast-forwarded from upstream by the sync bot only. |
 | `smg` | `main` + our patches. Production images build from here. Default branch. | Changes land through PRs. Updated by merging `main`, never rebased. |
-| `feat/<topic>` | One upstream-able improvement | Branched from `main` (not `smg`) so the same branch can open a PR against upstream. Merged into `smg` with a merge commit, never rebased afterwards. |
+| `feat/<topic>` | One upstream-able improvement | Branched from `main` (not `smg`) so the same branch can open a PR against upstream. Merged into `smg` with a merge commit, never rebased afterwards. A ruleset blocks deleting `feat/*` branches, so merging into `smg` doesn't close the upstream PR. |
 | `internal/<topic>` | One SMG-only change | Branched from `smg`, squash-merged into `smg`. Not `smg/<topic>`: git cannot hold `smg/…` next to a branch named `smg`. |
 
 Flow for every improvement:
@@ -40,7 +40,7 @@ What we carry on top of upstream. `git log --first-parent --oneline main..smg` i
 
 | Branch | Type | Upstream PR | State | Upstream files touched |
 | --- | --- | --- | --- | --- |
-| `feat/members-table-search` | A | [CapSoftware/Cap#3919](https://github.com/CapSoftware/Cap/pull/3919) | PR open (not in smg) | `apps/web/app/(org)/dashboard/settings/organization/components/MembersCard.tsx`, `apps/web/content/docs/teams.mdx` |
+| `feat/members-table-search` | A | [CapSoftware/Cap#3919](https://github.com/CapSoftware/Cap/pull/3919) | In smg ([#4](https://github.com/Solomedia/cap/pull/4)), PR open upstream | `apps/web/app/(org)/dashboard/settings/organization/components/MembersCard.tsx`, `apps/web/content/docs/teams.mdx` |
 
 Type A: upstream-able (`feat/*`). Type B: SMG-only (`internal/*`). States: `In smg`, `PR open`, `Merged upstream`, `Rejected upstream → SMG-only`.
 
@@ -87,7 +87,7 @@ Related upstream threads worth following:
 
 ## Still to set up
 
-Phase 0 (sync, CI, image build, deploys frozen) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, both rulesets are active (`ci-ok` is the required check on `smg`), the `production` environment only deploys from `smg`, and every inherited workflow is disabled.
+Phase 0 (sync, CI, image build, deploys frozen) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, the rulesets are active (`ci-ok` is the required check on `smg`; `feat/*` branches can't be deleted), the `production` environment only deploys from `smg`, and every inherited workflow is disabled.
 
 Left to do:
 
