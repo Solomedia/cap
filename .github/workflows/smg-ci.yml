@@ -5,6 +5,10 @@ on:
     branches: [smg]
     # labeled/unlabeled re-run the migration gate when `migrations-approved` is added.
     types: [opened, synchronize, reopened, labeled, unlabeled]
+  # Railway builds Cap Web from smg with "Wait for CI": it deploys a commit only
+  # after the workflows that run on its push succeed.
+  push:
+    branches: [smg]
   workflow_dispatch:
 
 concurrency:
@@ -27,7 +31,7 @@ jobs:
 
       - name: Detect changes
         id: filter
-        if: github.event_name == 'pull_request'
+        if: github.event_name != 'workflow_dispatch'
         uses: dorny/paths-filter@v3
         with:
           filters: |
@@ -111,10 +115,11 @@ jobs:
           mapfile -t files <<< "$list"
           bun run --cwd apps/web test "${files[@]}"
 
+  # On push Railway builds the image itself, so this only runs on PRs.
   docker:
     name: docker
     needs: changes
-    if: needs.changes.outputs.web == 'true'
+    if: github.event_name == 'pull_request' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

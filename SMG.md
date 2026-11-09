@@ -11,7 +11,7 @@ Full workflow: [smg/fork-workflow.md](smg/fork-workflow.md).
 | Branch | Purpose | Rules |
 | --- | --- | --- |
 | `main` | Exact mirror of `CapSoftware/Cap:main` | Never commit here. Fast-forwarded from upstream by the sync bot only. |
-| `smg` | `main` + our patches. Production images build from here. Default branch. | Changes land through PRs. Updated by merging `main`, never rebased. |
+| `smg` | `main` + our patches. Railway builds and deploys Cap Web from here. Default branch. | Changes land through PRs. Updated by merging `main`, never rebased. |
 | `feat/<topic>` | One upstream-able improvement | Branched from `main` (not `smg`) so the same branch can open a PR against upstream. Merged into `smg` with a merge commit, never rebased afterwards. A ruleset blocks deleting `feat/*` branches, so merging into `smg` doesn't close the upstream PR. |
 | `internal/<topic>` | One SMG-only change | Branched from `smg`, squash-merged into `smg`. Not `smg/<topic>`: git cannot hold `smg/…` next to a branch named `smg`. |
 
@@ -33,6 +33,15 @@ GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap
 ```
 
 The first command only prints what would happen. The second one fast-forwards `main`, turns off any new upstream workflow, and opens the sync PR into `smg` (auto-merge on green CI, or held when it brings migrations). It uses a temporary worktree, so your checkout and branch are not touched.
+
+## Deploys and Railway config
+
+Cap Web's Railway settings live in [`.railway/railway.ts`](.railway/railway.ts) as Railway Infrastructure as Code (not the deprecated `railway.json`). It is a partial that owns only Cap Web; MySQL, Cap Media Server, Cap Loom Importer and `cap-admin-library-sync` stay in the dashboard. Variables and secrets are not in the file: they stay in Railway.
+
+- **Config changes** go through a PR that touches `.railway/`. `SMG Railway plan` comments the plan on the PR; merging applies that exact plan (`SMG Railway apply`). Preview locally with `railway config plan` from a linked checkout.
+- **Code changes** deploy when they reach `smg`. Railway builds `apps/web/Dockerfile` from `smg` and waits for the `SMG CI` run on that push ("Wait for CI"): if it fails, that commit is not deployed.
+- **Migrations** run when Cap Web starts, and a rollback doesn't undo them. That is why a PR that adds one needs the `migrations-approved` label, given after a MySQL backup.
+- **To pause deploys**, turn off the GitHub autodeploy on Cap Web in Railway. To roll back, redeploy an earlier deployment from the Railway dashboard.
 
 ## Patch ledger
 
@@ -87,10 +96,11 @@ Related upstream threads worth following:
 
 ## Still to set up
 
-Phase 0 (sync, CI, image build, deploys frozen) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, the rulesets are active (`ci-ok` is the required check on `smg`; `feat/*` branches can't be deleted), the `production` environment only deploys from `smg`, and every inherited workflow is disabled.
+Phase 0 (sync and CI) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, the rulesets are active (`ci-ok` is the required check on `smg`; `feat/*` branches can't be deleted), the `production` environment only accepts `smg`, and every inherited workflow is disabled. On 2026-11-09 the GHCR image pipeline was replaced by Railway building from GitHub, with its config in `.railway/railway.ts`.
 
 Left to do:
 
 - **Sync bot.** Create the GitHub App, store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY`, then set `SMG_BOT_ENABLED=true`. Until then the sync runs by hand (see "Weekly sync").
-- **Image visibility.** Make the `cap-web` package public in the org's Packages settings, so Railway can pull it without credentials.
-- **Phase 1**, after the 2021–2024 Loom import: add `RAILWAY_TOKEN` to `production`, check the migrations against the running image, switch Cap Web to our digest in one deploy with the AI variables, turn off image auto-updates, and set `SMG_DEPLOY_FREEZE=false`.
+- **`RAILWAY_TOKEN`.** A Railway project token for the `production` environment, stored as a repository secret. The plan and apply workflows need it.
+- **Cutover.** Switch Cap Web's source in `.railway/railway.ts` from the official image to `github("Solomedia/cap", { branch: "smg" })` with Wait for CI, in a PR merged during a maintenance window: MySQL backup first, Loom import paused, and the official image digest kept for rollback. The first deploy runs migration `0052_directory_sync`.
+- **AI**, after the 2021–2024 Loom import: add the AI variables to Cap Web in Railway.

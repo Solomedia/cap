@@ -112,6 +112,8 @@ Two cases need a human, and the sync PR surfaces both as a conflict:
 
 One sync PR at a time: while a sync PR is open (pending, red or held for migrations), the next sync keeps `main` current but opens no new PR.
 
+*(Superseded on 2026-11-09 by section 15: Railway builds Cap Web from GitHub.)*
+
 **`smg-deploy.yml`**: on push to `smg` (and manual dispatch with an optional commit or digest for rollback):
 1. Build `apps/web/Dockerfile` for `linux/amd64` only (Railway's platform), with Actions cache. Push `ghcr.io/solomedia/cap-web:smg-<shortsha>` (immutable) and `:smg` (moving). Media server stays on the official image in the first version (section 2).
 2. If repository variable `SMG_DEPLOY_FREEZE` is `true`, stop here: the image exists, nothing deploys. The job summary says so.
@@ -145,9 +147,7 @@ A table in `SMG.md` with one row per carried change: branch, type (A or B), upst
 ## 11. Access and secrets
 
 - **Sync bot:** a GitHub App installed on `Solomedia/cap` with contents and pull-request write, so its pushes and PRs trigger CI. It is the only actor allowed to update `main`.
-- **`RAILWAY_TOKEN`:** a Railway project token for "SMG - CAP" production, stored in a GitHub **`production` environment** whose deployment branches are limited to `smg`, so no other branch's workflow can read it. Both `smg-deploy` jobs also refuse to run outside `refs/heads/smg`.
-- **GHCR:** the `cap-web` package is public (the source is public under AGPL), so Railway pulls without registry credentials.
-- Railway's image auto-updates on Cap Web are turned off when Cap Web moves to our image: our pipeline is the only thing that changes the image.
+- **`RAILWAY_TOKEN`:** a Railway project token for "SMG - CAP" production, stored as a repository secret: the plan job runs on PRs, which the `production` environment doesn't admit. The apply job also runs in the `production` environment, limited to `smg`. *(Changed on 2026-11-09, section 15.)*
 
 ## 12. Rollout
 
@@ -173,7 +173,7 @@ Phase 2, later:
 Decided in this design
 - Merge-based `smg` (no rebase), `feat/*` from `main`, merge-commit merges into `smg`.
 - Daily scheduled sync through a PR with auto-merge on green CI.
-- Our own image on GHCR, amd64 only, deployed by digest through the Railway API, with a repository-variable freeze switch.
+- ~~Our own image on GHCR, deployed by digest through the Railway API, with a freeze switch.~~ Replaced on 2026-11-09: Railway builds from GitHub with Wait for CI, config in `.railway/railway.ts` (section 15).
 - Inherited workflows disabled through settings, not file edits.
 - No SMG-only migrations.
 
@@ -186,5 +186,16 @@ Left to the builder
 ## 14. Rejected alternatives
 
 - **Rebased patch stack on top of `main`:** clean history, but force pushes on the deploy branch, blocked by our hooks, breaks open branches and loses the link between production and a stable commit.
-- **Railway building from the repo:** every push redeploys automatically with no freeze or approval, the monorepo build runs on Railway's builders, and rollback is coarser than a digest.
+- ~~**Railway building from the repo:** every push redeploys automatically with no freeze or approval, the monorepo build runs on Railway's builders, and rollback is coarser than a digest.~~ Reversed on 2026-11-09 (section 15): Wait for CI gates each deploy, the autodeploy toggle is the freeze, and Railway rolls back to any earlier deployment.
 - **Keeping the official image and patching nothing:** upstream publishes `cap-web` by hand with gaps of up to two months, so we would wait for fixes even with zero patches.
+
+## 15. Amendment 2026-11-09: Railway builds from GitHub, config as IaC
+
+Decided by Hildegar on 2026-11-09, replacing the GHCR image and our deploy script (`smg-deploy.yml`, `scripts/smg/deploy-railway.ts`).
+
+- **Build and deploy:** Cap Web's source is `github("Solomedia/cap", { branch: "smg" })`, built from `apps/web/Dockerfile`, with Wait for CI (`checkSuites`). Railway deploys a commit only after the workflows that run on its push succeed. `SMG CI` runs on push to `smg` for that reason, without the Docker job, since Railway builds the image. Watch patterns limit builds to the web app and the packages it uses.
+- **Config:** Cap Web's Railway settings live in `.railway/railway.ts` (Railway Infrastructure as Code; `railway.json` is deprecated and stops working on 2026-12-01). The file is the `cap-web` partial: it owns only Cap Web, so it can't delete or change MySQL, Cap Media Server, Cap Loom Importer or `cap-admin-library-sync`. Variables are unmanaged and stay in Railway.
+- **Changes to the config** go through PRs: `SMG Railway plan` comments the plan and pins it; on merge, `SMG Railway apply` applies that exact plan, or fails if Railway changed since.
+- **Freeze and rollback:** turn off Cap Web's GitHub autodeploy to stop deploys; roll back by redeploying an earlier deployment in Railway. The migration gate (section 6) is unchanged and still the only protection for the schema.
+- **Why:** less code of ours on the way to production (the deploy script called Railway GraphQL mutations never tested against production), one environment (no need for one image deployed in several places), and infra changes reviewed in PRs.
+- **Cutover:** a separate PR switches the source from the official image, merged in a maintenance window: MySQL backup, Loom import paused and drained, official digest `e2dbc1e8…` kept for rollback.

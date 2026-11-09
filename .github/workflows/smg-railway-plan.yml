@@ -1,0 +1,44 @@
+name: SMG Railway plan
+
+# Plans .railway/railway.ts on every PR that touches it and comments the diff.
+# The plan is pinned as an artifact; smg-railway-apply.yml applies exactly that
+# plan when the PR merges.
+
+on:
+  pull_request:
+    branches: [smg]
+    paths: [".railway/**"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: smg-railway-plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: railway plan
+    # Fork PRs get no secrets.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
+      # Only the IaC SDK, not the whole monorepo.
+      - name: Install the Railway SDK
+        run: bun install --frozen-lockfile --cwd .railway
+
+      - name: Plan
+        uses: railwayapp/config@9e17d413dbe219f19d62538d9c06b5dbb5e9abf8 # v1.2.0
+        with:
+          command: plan
+          package-manager: none
+          railway-token: ${{ secrets.RAILWAY_TOKEN }}
