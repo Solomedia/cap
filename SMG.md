@@ -87,4 +87,10 @@ Related upstream threads worth following:
 
 ## Still to set up
 
-Phase 0 (sync, CI, image build, deploys frozen): [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md).
+Phase 0 (sync, CI, image build, deploys frozen) is live since 2026-11-08: [smg/plans/2026-11-08-fork-workflow-phase-0.md](smg/plans/2026-11-08-fork-workflow-phase-0.md). `smg` is the default branch, both rulesets are active (`ci-ok` is the required check on `smg`), the `production` environment only deploys from `smg`, and every inherited workflow is disabled.
+
+Left to do:
+
+- **Sync bot.** Create the GitHub App, store `SMG_BOT_APP_ID` and `SMG_BOT_PRIVATE_KEY`, then set `SMG_BOT_ENABLED=true`. Until then the sync runs by hand (see "Weekly sync").
+- **Image visibility.** Make the `cap-web` package public in the org's Packages settings, so Railway can pull it without credentials.
+- **Phase 1**, after the 2021–2024 Loom import: add `RAILWAY_TOKEN` to `production`, check the migrations against the running image, switch Cap Web to our digest in one deploy with the AI variables, turn off image auto-updates, and set `SMG_DEPLOY_FREEZE=false`.
