@@ -48,7 +48,11 @@ async function openIssue(issue: {
 	body: string;
 	labels: string[];
 }) {
-	await $`gh issue create --repo ${repo} --title ${issue.title} --body ${issue.body} --label ${issue.labels.join(",")}`;
+	await act(
+		`open issue "${issue.title}"`,
+		() =>
+			$`gh issue create --repo ${repo} --title ${issue.title} --body ${issue.body} --label ${issue.labels.join(",")}`,
+	);
 }
 
 async function ensureLabels() {
@@ -184,7 +188,9 @@ if (trial.exitCode !== 0 || conflicted.length > 0) {
 		conflicts.push({ file, smgCommits });
 	}
 	await openIssue(buildConflictIssue({ branch, conflicts }));
-	console.log(`conflict in ${conflicted.length} file(s); opened an issue`);
+	console.log(
+		`conflict in ${conflicted.length} file(s); ${dryRun ? "a real run opens" : "opened"} an issue`,
+	);
 	process.exit(0);
 }
 
