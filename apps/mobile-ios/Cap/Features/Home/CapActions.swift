@@ -19,7 +19,34 @@ enum CapActions {
         do {
             let updated = try await session.api.updateSharing(id, isPublic: isPublic)
             session.capChanged(updated)
-            session.toasts.show(isPublic ? "Anyone with the link can view" : "Only you and your team can view", systemImage: isPublic ? "globe" : "lock.fill")
+            let restricted = updated.isPublic && updated.linkRestricted == true
+            session.toasts.show(
+                restricted ? "Only your organization's emails can view" : isPublic ? "Anyone with the link can view" : "Only you and your team can view",
+                systemImage: isPublic ? "globe" : "lock.fill"
+            )
+            return updated
+        } catch {
+            session.capChanged(cap)
+            session.toasts.show(error)
+            return nil
+        }
+    }
+
+    @discardableResult
+    static func setLinkAccess(_ cap: CapSummary, linkAccess: LinkAccess, session: SessionModel) async -> CapSummary? {
+        guard let id = CapID(cap.id), cap.isPublic else { return nil }
+        var optimistic = cap
+        optimistic.linkAccess = linkAccess
+        session.capChanged(optimistic)
+        do {
+            let updated = try await session.api.updateSharing(id, isPublic: true, linkAccess: linkAccess)
+            session.capChanged(updated)
+            if updated.isPublic {
+                session.toasts.show(
+                    updated.linkRestricted == true ? "Only your organization's emails can view" : "Anyone with the link can view",
+                    systemImage: updated.linkRestricted == true ? "person.2" : "globe"
+                )
+            }
             return updated
         } catch {
             session.capChanged(cap)
@@ -85,7 +112,7 @@ private struct CapContextMenu: ViewModifier {
 
 private struct CapDeleteConfirmation: ViewModifier {
     @Binding var pendingDelete: CapSummary?
-    var onDeleted: () -> Void = {}
+    var onDeleted: (CapSummary) -> Void = { _ in }
     @Environment(SessionModel.self) private var session
 
     func body(content: Content) -> some View {
@@ -97,7 +124,7 @@ private struct CapDeleteConfirmation: ViewModifier {
         ) { cap in
             Button("Delete Cap", role: .destructive) {
                 Task {
-                    if await CapActions.delete(cap, session: session) { onDeleted() }
+                    if await CapActions.delete(cap, session: session) { onDeleted(cap) }
                 }
             }
             Button("Cancel", role: .cancel) {}
@@ -112,7 +139,7 @@ extension View {
         modifier(CapContextMenu(cap: cap, pendingDelete: pendingDelete))
     }
 
-    func capDeleteConfirmation(pendingDelete: Binding<CapSummary?>, onDeleted: @escaping () -> Void = {}) -> some View {
+    func capDeleteConfirmation(pendingDelete: Binding<CapSummary?>, onDeleted: @escaping (CapSummary) -> Void = { _ in }) -> some View {
         modifier(CapDeleteConfirmation(pendingDelete: pendingDelete, onDeleted: onDeleted))
     }
 }
