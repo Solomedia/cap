@@ -84,6 +84,9 @@ struct SettingsView: View {
             }
 
             Section("App") {
+                NavigationLink(value: Route.notifications) {
+                    Label("Notifications", systemImage: "bell")
+                }
                 // A plain account link for every storefront: the dashboard's home, never billing, and nothing near the
                 // plan's limit, so it isn't a call to buy outside the App Store (App Review 3.1.1(a)).
                 Button {
@@ -141,6 +144,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .readableWidth()
         .navigationTitle("Settings")
         .toolbarTitleDisplayMode(.inlineLarge)
         .refreshable {
@@ -249,6 +253,7 @@ struct ProfileSettingsView: View {
                 Section { ErrorText(error) }
             }
         }
+        .readableWidth()
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -361,6 +366,7 @@ struct DeleteAccountView: View {
                 .disabled(confirmation != "DELETE" || isDeleting)
             }
         }
+        .readableWidth()
         .navigationTitle("Delete account")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("Delete your Cap account?", isPresented: $confirming, titleVisibility: .visible) {
