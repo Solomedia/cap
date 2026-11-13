@@ -2,7 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
 	CAP_WEB_SERVICE_ID,
+	GEOIP_DATABASE_PATH,
 	railwayDockerfile,
+	smgWebDockerfile,
+	withGeoIpDatabase,
 } from "../lib/railway-dockerfile.ts";
 
 describe("railwayDockerfile", () => {
@@ -51,6 +54,34 @@ describe("railwayDockerfile", () => {
 	test("smg/web.Dockerfile is up to date with apps/web/Dockerfile", () => {
 		const upstream = readFileSync("apps/web/Dockerfile", "utf8");
 		const ours = readFileSync("smg/web.Dockerfile", "utf8");
-		expect(ours).toBe(railwayDockerfile(upstream));
+		expect(ours).toBe(smgWebDockerfile(upstream));
+	});
+});
+
+describe("withGeoIpDatabase", () => {
+	const dockerfile =
+		"FROM node AS base\nFROM base AS builder\nRUN build\nFROM base AS runner\nCOPY a b\nUSER nextjs\nCMD node server.js\n";
+
+	test("downloads the database in its own stage and points the app at it", () => {
+		const out = withGeoIpDatabase(dockerfile);
+		expect(out.indexOf("FROM base AS geoip")).toBeLessThan(
+			out.indexOf("FROM base AS runner"),
+		);
+		expect(out).toContain("ARG RAILWAY_GIT_COMMIT_SHA");
+		expect(out).toContain(
+			"https://download.db-ip.com/free/dbip-city-lite-$month.mmdb.gz",
+		);
+		expect(out).toContain(
+			`COPY --from=geoip --chown=nextjs:nodejs /geoip /app/geoip\nENV CAP_GEOIP_DATABASE_PATH=${GEOIP_DATABASE_PATH}\n\nUSER nextjs`,
+		);
+	});
+
+	test("fails when upstream's Dockerfile loses an anchor", () => {
+		expect(() =>
+			withGeoIpDatabase(dockerfile.replace("USER nextjs\n", "")),
+		).toThrow('"USER nextjs"');
+		expect(() =>
+			withGeoIpDatabase(dockerfile.replace("FROM base AS runner", "FROM base")),
+		).toThrow('"FROM base AS runner"');
 	});
 });
