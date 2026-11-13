@@ -110,6 +110,10 @@ export interface VideoMetadata {
 	sampleRate: number | null;
 	bitrate: number;
 	fileSize: number;
+	// How long the file's timestamps run, when the probe measured them. An
+	// encode is held to the longer of this and duration, and is not held at
+	// all when it is unknown.
+	timestampSpan?: number | null;
 }
 
 export interface Job {
@@ -156,6 +160,9 @@ export interface Job {
 	webhookUrl?: string;
 	webhookSecret?: string;
 	abortController?: AbortController;
+	// A ladder for a Cap Infra video at the 1440p or 2160p tier, which keeps the
+	// GPU encoder busy on its own.
+	infraHeavyLadder?: boolean;
 }
 
 const jobs = new Map<string, Job>();
@@ -350,6 +357,55 @@ export function getSystemResources(): SystemResources {
 
 export function hasCriticalMemoryPressure(): boolean {
 	return getSystemResources().memoryPressure >= MEMORY_REJECT_THRESHOLD;
+}
+
+// Cap Infra jobs share the workers with Cap's own recordings. They may not take
+// the last free slots, and only one Infra ladder at 1440p or 2160p runs on a
+// worker at a time: one already fills the GPU encoder, and a second one slows
+// both of them and every recording that lands beside them.
+const INFRA_RESERVED_SLOTS = Math.max(
+	0,
+	Number.parseInt(process.env.MEDIA_SERVER_INFRA_RESERVED_SLOTS ?? "1", 10) ||
+		0,
+);
+const MAX_INFRA_HEAVY_LADDERS = Math.max(
+	1,
+	Number.parseInt(
+		process.env.MEDIA_SERVER_MAX_INFRA_HEAVY_LADDERS ?? "1",
+		10,
+	) || 1,
+);
+
+export function getActiveInfraHeavyLadderCount(): number {
+	let count = 0;
+	for (const job of jobs.values()) {
+		if (job.infraHeavyLadder && isActivePhase(job.phase)) count++;
+	}
+	return count;
+}
+
+export function infraCapacityAllows(input: {
+	effectiveMax: number;
+	active: number;
+	activeHeavyLadders: number;
+	heavyLadder: boolean;
+	reservedSlots?: number;
+	maxHeavyLadders?: number;
+}): boolean {
+	const reservedSlots = input.reservedSlots ?? INFRA_RESERVED_SLOTS;
+	const maxHeavyLadders = input.maxHeavyLadders ?? MAX_INFRA_HEAVY_LADDERS;
+	const reserved = Math.min(reservedSlots, Math.max(0, input.effectiveMax - 1));
+	if (input.active >= input.effectiveMax - reserved) return false;
+	return !input.heavyLadder || input.activeHeavyLadders < maxHeavyLadders;
+}
+
+export function canAcceptNewInfraVideoProcess(heavyLadder: boolean): boolean {
+	return infraCapacityAllows({
+		effectiveMax: getSystemResources().effectiveMax,
+		active: getActiveVideoProcessCount(),
+		activeHeavyLadders: getActiveInfraHeavyLadderCount(),
+		heavyLadder,
+	});
 }
 
 export function canAcceptNewVideoProcess(
