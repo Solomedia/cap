@@ -105,7 +105,7 @@ jobs:
           bun run --cwd apps/web next typegen
           bun run typecheck
 
-      # Same list upstream's CI runs (read from its ci.yml), plus tests this PR touches.
+      # The tests upstream's CI runs (read from its ci.yml), plus tests this PR touches.
       - name: Web unit tests
         env:
           BASE_REF: ${{ github.base_ref || 'smg' }}

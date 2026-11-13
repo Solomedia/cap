@@ -50,7 +50,7 @@ describe("webTestFiles", () => {
 					"jobs:\n  x:\n    steps:\n      - name: Other\n        run: echo\n",
 				changedFiles: [],
 			}),
-		).toThrow(/Test web React compatibility/);
+		).toThrow(/bun run --cwd apps\/web test/);
 	});
 
 	test("throws when the step lists no files", () => {
@@ -58,10 +58,28 @@ describe("webTestFiles", () => {
 		expect(() => webTestFiles({ ciYaml: empty, changedFiles: [] })).toThrow();
 	});
 
+	test("passes a folder through when upstream runs the whole suite", () => {
+		const folder = `
+jobs:
+  web-tests:
+    steps:
+      - name: Test web
+        run: bun run --cwd apps/web test __tests__/unit
+`;
+		expect(
+			webTestFiles({
+				ciYaml: folder,
+				changedFiles: ["apps/web/__tests__/integration/x.test.ts"],
+			}),
+		).toEqual(["__tests__/unit", "__tests__/integration/x.test.ts"]);
+	});
+
 	test("reads the real upstream CI workflow", async () => {
 		const ciYaml = await Bun.file(".github/workflows/ci.yml").text();
-		expect(webTestFiles({ ciYaml, changedFiles: [] }).length).toBeGreaterThan(
-			50,
-		);
+		const tests = webTestFiles({ ciYaml, changedFiles: [] });
+		expect(tests.length).toBeGreaterThan(0);
+		for (const test of tests) {
+			expect(test.startsWith("__tests__/")).toBe(true);
+		}
 	});
 });
