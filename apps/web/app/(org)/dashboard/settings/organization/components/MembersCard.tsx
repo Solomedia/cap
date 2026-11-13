@@ -1,27 +1,12 @@
 "use client";
 
 import { buildEnv } from "@cap/env";
-import {
-	Button,
-	Card,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-	Input,
-	Select,
-	Switch,
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@cap/ui";
+import { Avatar, Button, Select, Switch } from "@cap/ui";
 import { faUser } from "@fortawesome/free-solid-svg-icons/faUser";
 import { useMutation } from "@tanstack/react-query";
-import clsx from "clsx";
 import { format } from "date-fns";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { Mail, Search, UserMinus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -31,115 +16,49 @@ import { toggleProSeat } from "@/actions/organization/toggle-pro-seat";
 import { updateOrganizationMemberRole } from "@/actions/organization/update-member-role";
 import { ConfirmationDialog } from "@/app/(org)/dashboard/_components/ConfirmationDialog";
 import { useDashboardContext } from "@/app/(org)/dashboard/Contexts";
-import type { Organization } from "@/app/(org)/dashboard/dashboard-data";
 import { FontAwesomeIcon } from "@/components/FontAwesomeIcon";
-import {
-	filterAndSortMembersTableRows,
-	type MembersTableRow,
-	type MembersTableSort,
-	type MembersTableSortKey,
-	type MembersTableStatus,
-	nextMembersTableSort,
-} from "@/lib/organization-members-table";
 import {
 	type AssignableOrganizationRole,
 	canChangeOrganizationMemberRole,
+	canManageOrganizationBilling,
 	canManageOrganizationMembers,
 	canManageOrganizationProSeats,
 	canRemoveOrganizationMember,
 	getEffectiveOrganizationRole,
 	normalizeAssignableOrganizationRole,
-	type OrganizationRole,
 	organizationRoleLabel,
 } from "@/lib/permissions/roles";
 import { calculateSeats } from "@/utils/organization";
+import {
+	doodleHost,
+	PaperPlaneDoodle,
+	SeatMeter,
+} from "../_components/doodles";
+import {
+	SettingsCard,
+	SettingsSection,
+	StatusChip,
+} from "../_components/settings-ui";
+import { SeatManagementCard } from "./SeatManagementCard";
 
 interface MembersCardProps {
 	setIsInviteDialogOpen: (isOpen: boolean) => void;
 }
 
-type Row = MembersTableRow &
-	(
-		| { kind: "member"; member: Organization["members"][number] }
-		| { kind: "invite"; invite: Organization["invites"][number] }
-	);
+const SEARCH_THRESHOLD = 8;
 
-const roleFilterOptions = [
-	{ value: "all", label: "All roles" },
-	{ value: "owner", label: "Owner" },
+const roleOptions = [
 	{ value: "admin", label: "Admin" },
 	{ value: "member", label: "Member" },
 ];
 
-const statusFilterOptions = [
-	{ value: "all", label: "All statuses" },
-	{ value: "active", label: "Active" },
-	{ value: "pending", label: "Pending" },
-	{ value: "invited", label: "Invited" },
-];
-
-const statusLabels: Record<MembersTableStatus, string> = {
-	active: "Active",
-	pending: "Pending",
-	invited: "Invited",
-};
-
-const isRoleFilter = (value: string): value is OrganizationRole | "all" =>
-	roleFilterOptions.some((option) => option.value === value);
-
-const isStatusFilter = (value: string): value is MembersTableStatus | "all" =>
-	statusFilterOptions.some((option) => option.value === value);
-
-const SortableHead = ({
-	label,
-	sortKey,
-	sort,
-	onSort,
-}: {
-	label: string;
-	sortKey: MembersTableSortKey;
-	sort: MembersTableSort | null;
-	onSort: (key: MembersTableSortKey) => void;
-}) => {
-	const direction = sort?.key === sortKey ? sort.direction : null;
-	const Icon =
-		direction === "asc"
-			? ArrowUp
-			: direction === "desc"
-				? ArrowDown
-				: ArrowUpDown;
-	return (
-		<TableHead
-			aria-sort={
-				direction === "asc"
-					? "ascending"
-					: direction === "desc"
-						? "descending"
-						: "none"
-			}
-		>
-			<button
-				type="button"
-				onClick={() => onSort(sortKey)}
-				className="inline-flex gap-1 items-center font-medium rounded-sm hover:text-gray-11 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-12"
-			>
-				{label}
-				<Icon
-					aria-hidden="true"
-					className={clsx(
-						"size-3.5",
-						direction ? "text-gray-12" : "text-gray-9",
-					)}
-				/>
-			</button>
-		</TableHead>
-	);
-};
+const plural = (count: number, word: string) =>
+	`${count} ${word}${count === 1 ? "" : "s"}`;
 
 export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 	const router = useRouter();
 	const { activeOrganization, user } = useDashboardContext();
-	const { proSeatsRemaining } = calculateSeats({
+	const { proSeatsRemaining, proSeatsUsed, proSeatsTotal } = calculateSeats({
 		...(activeOrganization || {}),
 		ownerId: activeOrganization?.organization.ownerId,
 		ownerIsPro: Boolean(activeOrganization?.ownerIsPro),
@@ -164,58 +83,7 @@ export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 	);
 	const canManageMembers = canManageOrganizationMembers(currentRole);
 	const canManageProSeats = canManageOrganizationProSeats(currentRole);
-
-	const [search, setSearch] = useState("");
-	const [roleFilter, setRoleFilter] = useState<OrganizationRole | "all">("all");
-	const [statusFilter, setStatusFilter] = useState<MembersTableStatus | "all">(
-		"all",
-	);
-	const [sort, setSort] = useState<MembersTableSort | null>(null);
-
-	const allRows: Row[] = [
-		...(activeOrganization?.members ?? []).map(
-			(member): Row => ({
-				kind: "member",
-				member,
-				name: member.user.name,
-				email: member.user.email,
-				role:
-					getEffectiveOrganizationRole({
-						userId: member.user.id,
-						ownerId: activeOrganization?.organization.ownerId,
-						memberRole: member.role,
-					}) ?? "member",
-				status: pendingInviteEmails.has(member.user.email.toLowerCase())
-					? "pending"
-					: "active",
-				joinedAt: member.createdAt,
-			}),
-		),
-		...(activeOrganization?.invites ?? [])
-			.filter((invite) => !memberEmails.has(invite.invitedEmail.toLowerCase()))
-			.map(
-				(invite): Row => ({
-					kind: "invite",
-					invite,
-					name: null,
-					email: invite.invitedEmail,
-					role: normalizeAssignableOrganizationRole(invite.role) ?? "member",
-					status: "invited",
-					joinedAt: null,
-				}),
-			),
-	];
-	const visibleRows = filterAndSortMembersTableRows(allRows, {
-		search,
-		role: roleFilter,
-		status: statusFilter,
-		sort,
-	});
-	const hasActiveFilters =
-		search.trim() !== "" || roleFilter !== "all" || statusFilter !== "all";
-	const handleSort = (key: MembersTableSortKey) =>
-		setSort((current) => nextMembersTableSort(current, key));
-	const columnCount = buildEnv.NEXT_PUBLIC_IS_CAP ? 7 : 6;
+	const canManageBilling = canManageOrganizationBilling(currentRole);
 
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [pendingMember, setPendingMember] = useState<{
@@ -224,10 +92,7 @@ export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 		email: string;
 	} | null>(null);
 	const [deletingInviteId, setDeletingInviteId] = useState<string | null>(null);
-	const roleOptions = [
-		{ value: "admin", label: "Admin" },
-		{ value: "member", label: "Member" },
-	];
+	const [search, setSearch] = useState("");
 	const showMemberManagerToast = () => {
 		toast.error("Only admins and owners can manage organization members");
 	};
@@ -335,21 +200,34 @@ export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 		},
 	});
 
-	const handleRemoveMember = (member: {
-		id: string;
-		user: { name: string; email: string };
-	}) => {
-		setPendingMember({
-			id: member.id,
-			name: member.user.name,
-			email: member.user.email,
-		});
-		setConfirmOpen(true);
+	const openInvite = () => {
+		if (!canManageMembers) {
+			showMemberManagerToast();
+			return;
+		}
+		setIsInviteDialogOpen(true);
 	};
 
-	const isMemberOwner = (id: string) => {
-		return id === activeOrganization?.organization.ownerId;
-	};
+	const members = activeOrganization?.members ?? [];
+	const invites = (activeOrganization?.invites ?? []).filter(
+		(invite) => !memberEmails.has(invite.invitedEmail.toLowerCase()),
+	);
+	const query = search.trim().toLowerCase();
+	const showSearch =
+		query.length > 0 || members.length + invites.length >= SEARCH_THRESHOLD;
+	const visibleMembers = query
+		? members.filter((member) =>
+				`${member.user.name ?? ""} ${member.user.lastName ?? ""} ${member.user.email}`
+					.toLowerCase()
+					.includes(query),
+			)
+		: members;
+	const visibleInvites = query
+		? invites.filter((invite) =>
+				invite.invitedEmail.toLowerCase().includes(query),
+			)
+		: invites;
+	const isAlone = members.length <= 1 && invites.length === 0;
 
 	return (
 		<>
@@ -375,190 +253,155 @@ export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 					setPendingMember(null);
 				}}
 			/>
-			<Card>
-				<div className="flex flex-wrap gap-6 justify-between items-center w-full">
-					<CardHeader>
-						<CardTitle>Members</CardTitle>
-						<CardDescription>Manage your organization members.</CardDescription>
-					</CardHeader>
-					<Button
-						type="button"
-						size="sm"
-						variant="dark"
-						className="px-6 min-w-auto"
-						onClick={() => {
-							if (!canManageMembers) {
-								showMemberManagerToast();
-								return;
-							}
-							setIsInviteDialogOpen(true);
-						}}
-						disabled={!canManageMembers}
-					>
-						+ Invite users
-					</Button>
-				</div>
-				<div className="flex flex-wrap gap-3 items-center mt-5">
-					<div className="relative flex-1 min-w-[220px]">
-						<Search
-							aria-hidden="true"
-							className="absolute left-3 top-1/2 z-10 size-4 -translate-y-1/2 text-gray-9"
-						/>
-						<Input
-							type="search"
-							value={search}
-							onChange={(event) => setSearch(event.target.value)}
-							placeholder="Search by name or email"
-							aria-label="Search members"
-							className="pl-9"
-						/>
+			<SettingsSection
+				title="Members"
+				action={
+					<div className="flex gap-4 items-center">
+						<span className="text-[13px] text-gray-10">
+							{plural(members.length, "member")}
+							{invites.length > 0 && ` · ${invites.length} invited`}
+						</span>
+						<Button
+							type="button"
+							size="xs"
+							variant="dark"
+							className="px-4"
+							onClick={openInvite}
+							disabled={!canManageMembers}
+						>
+							Invite people
+						</Button>
 					</div>
-					<Select
-						value={roleFilter}
-						options={roleFilterOptions}
-						placeholder="Role"
-						variant="light"
-						className="sm:w-40"
-						onValueChange={(value) => {
-							if (isRoleFilter(value)) setRoleFilter(value);
-						}}
-					/>
-					<Select
-						value={statusFilter}
-						options={statusFilterOptions}
-						placeholder="Status"
-						variant="light"
-						className="sm:w-40"
-						onValueChange={(value) => {
-							if (isStatusFilter(value)) setStatusFilter(value);
-						}}
-					/>
-				</div>
-				{hasActiveFilters && (
-					<p className="mt-3 text-xs text-gray-10" aria-live="polite">
-						Showing {visibleRows.length} of {allRows.length}
-					</p>
-				)}
-				<Table className="mt-3">
-					<TableHeader>
-						<TableRow>
-							<SortableHead
-								label="Member"
-								sortKey="name"
-								sort={sort}
-								onSort={handleSort}
-							/>
-							<SortableHead
-								label="Email"
-								sortKey="email"
-								sort={sort}
-								onSort={handleSort}
-							/>
-							<SortableHead
-								label="Role"
-								sortKey="role"
-								sort={sort}
-								onSort={handleSort}
-							/>
-							{buildEnv.NEXT_PUBLIC_IS_CAP && <TableHead>Pro</TableHead>}
-							<SortableHead
-								label="Joined"
-								sortKey="joined"
-								sort={sort}
-								onSort={handleSort}
-							/>
-							<TableHead>Status</TableHead>
-							<TableHead>Actions</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{visibleRows.length === 0 && (
-							<TableRow>
-								<TableCell
-									colSpan={columnCount}
-									className="py-8 text-center text-gray-10"
+				}
+			>
+				<SettingsCard>
+					{!buildEnv.NEXT_PUBLIC_IS_CAP ? null : canManageBilling &&
+						activeOrganization?.hasActiveProSeatProvider ? (
+						<SeatManagementCard />
+					) : (
+						<div className="flex flex-wrap gap-x-6 gap-y-3 justify-between items-center px-4 py-3.5 sm:px-5">
+							<div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
+								<SeatMeter used={proSeatsUsed} total={proSeatsTotal} />
+								<p className="text-[13px] text-gray-11">
+									<span className="font-medium tabular-nums text-gray-12">
+										{proSeatsUsed} of {proSeatsTotal}
+									</span>{" "}
+									Pro seats in use
+								</p>
+							</div>
+							{canManageBilling ? (
+								<Link
+									href="/dashboard/settings/organization/billing"
+									className="text-[13px] font-medium underline-offset-4 text-gray-12 hover:underline"
 								>
-									No members match your search or filters.
-								</TableCell>
-							</TableRow>
-						)}
-						{visibleRows.map((row) => {
-							if (row.kind === "invite") {
-								const { invite } = row;
-								return (
-									<TableRow key={invite.id}>
-										<TableCell className="text-gray-10">Pending</TableCell>
-										<TableCell>{invite.invitedEmail}</TableCell>
-										<TableCell>{organizationRoleLabel(row.role)}</TableCell>
-										{buildEnv.NEXT_PUBLIC_IS_CAP && <TableCell>-</TableCell>}
-										<TableCell>-</TableCell>
-										<TableCell>{statusLabels[row.status]}</TableCell>
-										<TableCell>
-											<Button
-												type="button"
-												size="xs"
-												variant="destructive"
-												onClick={() => {
-													if (canManageMembers) {
-														deleteInviteMutation.mutate(invite.id);
-													} else {
-														showMemberManagerToast();
-													}
-												}}
-												disabled={
-													!canManageMembers || deletingInviteId === invite.id
-												}
-											>
-												{deletingInviteId === invite.id
-													? "Deleting..."
-													: "Delete Invite"}
-											</Button>
-										</TableCell>
-									</TableRow>
-								);
-							}
-							const { member } = row;
-							const ownerId = activeOrganization?.organization.ownerId;
-							const memberIsOwner = isMemberOwner(member.user.id);
-							const memberRole = getEffectiveOrganizationRole({
-								userId: member.user.id,
-								ownerId,
-								memberRole: member.role,
-							});
-							const assignableRole =
-								normalizeAssignableOrganizationRole(memberRole);
-							const canUpdateRole = canChangeOrganizationMemberRole({
-								actorRole: currentRole,
-								actorUserId: user.id,
-								targetUserId: member.user.id,
-								ownerId,
-								targetRole: memberRole,
-								nextRole: assignableRole,
-							});
-							const canRemoveMember = canRemoveOrganizationMember({
-								actorRole: currentRole,
-								actorUserId: user.id,
-								targetUserId: member.user.id,
-								ownerId,
-								targetRole: memberRole,
-							});
-							const roleUpdating =
-								updateRoleMutation.isPending &&
-								updateRoleMutation.variables?.memberId === member.id;
-							return (
-								<TableRow key={member.id}>
-									<TableCell>{member.user.name}</TableCell>
-									<TableCell>{member.user.email}</TableCell>
-									<TableCell>
-										{memberIsOwner || memberRole === "owner" ? (
-											"Owner"
+									Upgrade to Pro
+								</Link>
+							) : (
+								<p className="text-[13px] text-gray-10">
+									The organization owner manages seats.
+								</p>
+							)}
+						</div>
+					)}
+
+					{showSearch && (
+						<label className="flex gap-2.5 items-center px-4 h-11 sm:px-5">
+							<Search className="size-4 shrink-0 text-gray-9" />
+							<span className="sr-only">Search members</span>
+							<input
+								type="search"
+								value={search}
+								onChange={(event) => setSearch(event.target.value)}
+								placeholder="Search by name or email"
+								className="flex-1 min-w-0 text-[16px] bg-transparent outline-none md:text-[13px] text-gray-12 placeholder:text-gray-9"
+							/>
+						</label>
+					)}
+
+					{visibleMembers.map((member) => {
+						const memberIsOwner =
+							member.user.id === activeOrganization?.organization.ownerId;
+						const memberRole = getEffectiveOrganizationRole({
+							userId: member.user.id,
+							ownerId: activeOrganization?.organization.ownerId,
+							memberRole: member.role,
+						});
+						const assignableRole =
+							normalizeAssignableOrganizationRole(memberRole);
+						const canUpdateRole = canChangeOrganizationMemberRole({
+							actorRole: currentRole,
+							actorUserId: user.id,
+							targetUserId: member.user.id,
+							ownerId: activeOrganization?.organization.ownerId,
+							targetRole: memberRole,
+							nextRole: assignableRole,
+						});
+						const canRemoveMember = canRemoveOrganizationMember({
+							actorRole: currentRole,
+							actorUserId: user.id,
+							targetUserId: member.user.id,
+							ownerId: activeOrganization?.organization.ownerId,
+							targetRole: memberRole,
+						});
+						const roleUpdating =
+							updateRoleMutation.isPending &&
+							updateRoleMutation.variables?.memberId === member.id;
+						const seatUpdating =
+							toggleProSeatMutation.isPending &&
+							toggleProSeatMutation.variables?.memberId === member.id;
+						const noSeatsLeft = !member.hasProSeat && proSeatsRemaining <= 0;
+						const displayName =
+							[member.user.name, member.user.lastName]
+								.filter(Boolean)
+								.join(" ") || member.user.email;
+						const isOwnerRole = memberIsOwner || memberRole === "owner";
+
+						return (
+							<div
+								key={member.id}
+								className="flex flex-wrap gap-x-4 gap-y-2.5 items-center px-4 py-3 sm:px-5"
+							>
+								<div className="flex flex-1 gap-3 items-center min-w-0 basis-56">
+									<Avatar
+										name={member.user.name ?? member.user.email}
+										imageUrl={member.user.image}
+										className="size-9 shrink-0"
+										letterClass="text-sm"
+									/>
+									<div className="flex flex-col min-w-0">
+										<div className="flex gap-2 items-center min-w-0">
+											<span className="text-sm font-medium truncate text-gray-12">
+												{displayName}
+											</span>
+											{member.user.id === user.id && (
+												<span className="text-xs text-gray-9">You</span>
+											)}
+											{pendingInviteEmails.has(
+												member.user.email.toLowerCase(),
+											) && <StatusChip>Pending</StatusChip>}
+										</div>
+										<span className="text-[13px] truncate text-gray-10">
+											{member.user.email}
+										</span>
+									</div>
+								</div>
+								<span className="hidden w-32 text-[13px] text-gray-10 xl:block">
+									Joined {format(member.createdAt, "MMM d, yyyy")}
+								</span>
+								<div className="flex gap-3 items-center sm:gap-4">
+									<div className="sm:w-[112px]">
+										{isOwnerRole ? (
+											<span className="px-3 text-[13px] font-medium text-gray-12">
+												Owner
+											</span>
 										) : (
 											<Select
 												value={assignableRole ?? "member"}
 												placeholder="Role"
 												options={roleOptions}
 												size="sm"
-												variant="gray"
+												variant="light"
+												className="rounded-full shadow-xs border-gray-4"
 												onValueChange={(value) => {
 													const nextRole =
 														normalizeAssignableOrganizationRole(value);
@@ -571,16 +414,26 @@ export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 												disabled={!canUpdateRole || roleUpdating}
 											/>
 										)}
-									</TableCell>
+									</div>
 									{buildEnv.NEXT_PUBLIC_IS_CAP && (
-										<TableCell>
+										<div className="flex gap-2 items-center sm:w-[124px]">
 											{memberIsOwner ? (
-												<span className="text-xs text-gray-10">
-													{activeOrganization?.ownerIsPro ? "Included" : "Free"}
+												<span className="text-[13px] text-gray-10">
+													{activeOrganization?.ownerIsPro
+														? "Pro included"
+														: "Free"}
 												</span>
 											) : (
-												<div className="flex items-center gap-2">
+												<>
 													<Switch
+														aria-label={`Pro seat for ${displayName}`}
+														title={
+															noSeatsLeft
+																? canManageBilling
+																	? "No Pro seats left. Add seats above."
+																	: "No Pro seats left. Ask the organization owner to add seats."
+																: undefined
+														}
 														checked={member.hasProSeat}
 														onCheckedChange={(checked) =>
 															toggleProSeatMutation.mutate({
@@ -589,61 +442,134 @@ export const MembersCard = ({ setIsInviteDialogOpen }: MembersCardProps) => {
 															})
 														}
 														disabled={
-															!canManageProSeats ||
-															(toggleProSeatMutation.isPending &&
-																toggleProSeatMutation.variables?.memberId ===
-																	member.id) ||
-															(!member.hasProSeat && proSeatsRemaining <= 0)
+															!canManageProSeats || seatUpdating || noSeatsLeft
 														}
 													/>
-													{member.hasProSeat &&
-														!activeOrganization?.hasActiveProSeatProvider && (
-															<span className="text-xs text-amber-600">
-																Inactive
-															</span>
-														)}
-												</div>
+													<span
+														className={
+															member.hasProSeat &&
+															!activeOrganization?.hasActiveProSeatProvider
+																? "text-[13px] text-amber-600"
+																: "text-[13px] text-gray-10"
+														}
+													>
+														{member.hasProSeat
+															? activeOrganization?.hasActiveProSeatProvider
+																? "Pro"
+																: "Inactive"
+															: "Free"}
+													</span>
+												</>
 											)}
-										</TableCell>
+										</div>
 									)}
-									<TableCell>
-										{format(member.createdAt, "MMM d, yyyy")}
-									</TableCell>
-									<TableCell>{statusLabels[row.status]}</TableCell>
-									<TableCell>
-										{!memberIsOwner ? (
-											<Button
+									<div className="flex justify-end w-8">
+										{!memberIsOwner && (
+											<button
 												type="button"
-												size="xs"
-												variant="destructive"
-												className="min-w-[unset] h-[28px]"
+												aria-label={`Remove ${displayName}`}
+												title="Remove from organization"
+												className="flex justify-center items-center rounded-full transition-colors size-8 text-gray-9 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-9"
 												onClick={() => {
-													if (canRemoveMember) {
-														handleRemoveMember({
-															id: member.id,
-															user: {
-																name: member.user.name ?? "(No Name)",
-																email: member.user.email ?? "(No Email)",
-															},
-														});
-													} else {
+													if (!canRemoveMember) {
 														showMemberManagerToast();
+														return;
 													}
+													setPendingMember({
+														id: member.id,
+														name: member.user.name ?? "(No Name)",
+														email: member.user.email ?? "(No Email)",
+													});
+													setConfirmOpen(true);
 												}}
 												disabled={!canRemoveMember}
 											>
-												Remove
-											</Button>
-										) : (
-											"-"
+												<UserMinus className="size-4" />
+											</button>
 										)}
-									</TableCell>
-								</TableRow>
-							);
-						})}
-					</TableBody>
-				</Table>
-			</Card>
+									</div>
+								</div>
+							</div>
+						);
+					})}
+
+					{visibleInvites.map((invite) => (
+						<div
+							key={invite.id}
+							className="flex flex-wrap gap-x-4 gap-y-2.5 items-center px-4 py-3 sm:px-5"
+						>
+							<div className="flex flex-1 gap-3 items-center min-w-0 basis-56">
+								<div className="flex justify-center items-center rounded-full border border-dashed size-9 shrink-0 border-gray-6 text-gray-9">
+									<Mail className="size-4" />
+								</div>
+								<div className="flex flex-col min-w-0">
+									<span className="text-sm font-medium truncate text-gray-12">
+										{invite.invitedEmail}
+									</span>
+									<span className="text-[13px] text-gray-10">
+										Invited as{" "}
+										{organizationRoleLabel(
+											normalizeAssignableOrganizationRole(invite.role) ??
+												"member",
+										).toLowerCase()}
+									</span>
+								</div>
+							</div>
+							<Button
+								type="button"
+								size="xs"
+								variant="outline"
+								className="px-4"
+								onClick={() => {
+									if (canManageMembers) {
+										deleteInviteMutation.mutate(invite.id);
+									} else {
+										showMemberManagerToast();
+									}
+								}}
+								disabled={!canManageMembers || deletingInviteId === invite.id}
+							>
+								{deletingInviteId === invite.id
+									? "Revoking..."
+									: "Revoke invite"}
+							</Button>
+						</div>
+					))}
+
+					{query && !visibleMembers.length && !visibleInvites.length && (
+						<p className="px-4 py-8 text-[13px] text-center text-gray-10 sm:px-5">
+							No one matches "{search.trim()}".
+						</p>
+					)}
+
+					{isAlone && (
+						<div
+							className={`flex flex-col gap-4 items-center px-4 py-10 text-center sm:px-5 ${doodleHost}`}
+						>
+							<PaperPlaneDoodle />
+							<div className="flex flex-col gap-1">
+								<p className="text-sm font-medium text-gray-12">
+									It's just you in here
+								</p>
+								<p className="max-w-sm text-[13px] leading-5 text-gray-10">
+									Invite your team to share caps, comment and work in the same
+									spaces.
+								</p>
+							</div>
+							<Button
+								type="button"
+								size="xs"
+								variant="outline"
+								className="px-4"
+								onClick={openInvite}
+								disabled={!canManageMembers}
+							>
+								Invite people
+							</Button>
+						</div>
+					)}
+				</SettingsCard>
+			</SettingsSection>
 		</>
 	);
 };

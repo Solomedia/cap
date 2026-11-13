@@ -50,12 +50,13 @@ What we carry on top of upstream. `git log --first-parent --oneline main..smg` i
 
 | Branch | Type | Upstream PR | State | Upstream files touched |
 | --- | --- | --- | --- | --- |
-| `feat/members-table-search` | A | [CapSoftware/Cap#3919](https://github.com/CapSoftware/Cap/pull/3919) | In smg ([#4](https://github.com/Solomedia/cap/pull/4)), PR open upstream | `apps/web/app/(org)/dashboard/settings/organization/components/MembersCard.tsx`, `apps/web/content/docs/teams.mdx` |
 | `feat/preview-og-fallback-relative-redirect` | A | [CapSoftware/Cap#3963](https://github.com/CapSoftware/Cap/pull/3963) | In smg ([#10](https://github.com/Solomedia/cap/pull/10)), PR open upstream | `apps/web/app/api/video/preview/route.ts` |
 | `feat/share-unfurl-ai-summary` | A | Not opened (improvement, not a fix; propose later if wanted) | In smg ([#11](https://github.com/Solomedia/cap/pull/11)) | `apps/web/app/s/[videoId]/page.tsx`, `apps/web/lib/share-video-metadata.ts` |
 | `feat/google-account-linking` | A | [CapSoftware/Cap#3964](https://github.com/CapSoftware/Cap/pull/3964) | In smg ([#12](https://github.com/Solomedia/cap/pull/12)), PR open upstream | `packages/database/auth/auth-options.ts`, `apps/web/app/(org)/login/form.tsx` |
 
 Type A: upstream-able (`feat/*`). Type B: SMG-only (`internal/*`). States: `In smg`, `PR open`, `Merged upstream`, `Rejected upstream → SMG-only`.
+
+Dropped: `feat/members-table-search` (2026-11-13). Upstream rewrote the members card with its own name and email search, so the 2026-11-13 sync takes upstream's version and [CapSoftware/Cap#3919](https://github.com/CapSoftware/Cap/pull/3919) was closed. The role and status filters and column sorting went with it.
 
 ## Scope
 
