@@ -46,9 +46,10 @@ export default defineRailway(() => {
 		deploy: {
 			// Sized from a week of use (2026-11-06 to 11-13): about 1.3 GB and
 			// 0.05 vCPU at normal peaks, 6.8 GB and 2 vCPU during the Loom import.
-			// NODE_OPTIONS caps the Node heap at 3 GB to stay under this limit;
-			// raise both together for another bulk import.
-			limitOverride: { containers: { cpu: 4, memoryBytes: 4_000_000_000 } },
+			// The limit leaves room above normal use so nothing slows down: CPU is
+			// only billed when used. NODE_OPTIONS caps the Node heap at 4 GB to
+			// stay under it; raise both together for another bulk import.
+			limitOverride: { containers: { cpu: 8, memoryBytes: 6_000_000_000 } },
 			overlapSeconds: 30,
 			restartPolicyType: "ALWAYS",
 		},
