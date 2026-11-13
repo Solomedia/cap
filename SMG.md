@@ -54,7 +54,7 @@ What we carry on top of upstream. `git log --first-parent --oneline main..smg` i
 | `feat/preview-og-fallback-relative-redirect` | A | [CapSoftware/Cap#3963](https://github.com/CapSoftware/Cap/pull/3963) | In smg ([#10](https://github.com/Solomedia/cap/pull/10)), PR open upstream | `apps/web/app/api/video/preview/route.ts` |
 | `feat/share-unfurl-ai-summary` | A | Not opened (improvement, not a fix; propose later if wanted) | In smg ([#11](https://github.com/Solomedia/cap/pull/11)) | `apps/web/app/s/[videoId]/page.tsx`, `apps/web/lib/share-video-metadata.ts` |
 | `feat/google-account-linking` | A | [CapSoftware/Cap#3964](https://github.com/CapSoftware/Cap/pull/3964) | In smg ([#12](https://github.com/Solomedia/cap/pull/12)), PR open upstream | `packages/database/auth/auth-options.ts`, `apps/web/app/(org)/login/form.tsx` |
-| `feat/self-hosted-geoip` | A | Not opened yet | PR open into smg ([#21](https://github.com/Solomedia/cap/pull/21)) | `apps/web/app/api/analytics/track/route.ts`, `apps/web/app/api/mobile/[...route]/route.ts`, `packages/env/server.ts`, `apps/web/package.json`, `bun.lock` |
+| `feat/self-hosted-geoip` | A | [CapSoftware/Cap#4158](https://github.com/CapSoftware/Cap/pull/4158) | In smg ([#21](https://github.com/Solomedia/cap/pull/21), [#23](https://github.com/Solomedia/cap/pull/23)), PR open upstream | `apps/web/app/api/analytics/track/route.ts`, `apps/web/app/api/mobile/[...route]/route.ts`, `packages/env/server.ts`, `apps/web/package.json`, `bun.lock`, `README.md` |
 
 Type A: upstream-able (`feat/*`). Type B: SMG-only (`internal/*`). States: `In smg`, `PR open`, `Merged upstream`, `Rejected upstream → SMG-only`.
 
