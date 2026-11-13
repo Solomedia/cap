@@ -1,4 +1,4 @@
-# Generated from apps/web/Dockerfile for Railway: no syntax directive, Railway cache mount ids.
+# Generated from apps/web/Dockerfile for Railway: no syntax directive, Railway cache mount ids, GeoIP database.
 # Do not edit. Regenerate with: bun scripts/smg/railway-dockerfile.ts --write
 
 FROM oven/bun:1.4.4-alpine AS bun
@@ -19,6 +19,18 @@ RUN bun run build:web
 
 
 # 3. Production image, copy all the files and run next
+# GeoIP database for view locations (DB-IP City Lite, CC BY 4.0, https://db-ip.com)
+FROM base AS geoip
+ARG RAILWAY_GIT_COMMIT_SHA
+RUN mkdir -p /geoip && cd /geoip && \
+	for month in "$(date -u +%Y-%m)" "$(date -u -d "@$(( $(date -u +%s) - 2678400 ))" +%Y-%m)"; do \
+		if wget -q -O db.mmdb.gz "https://download.db-ip.com/free/dbip-city-lite-$month.mmdb.gz" && gunzip -f db.mmdb.gz; then \
+			mv db.mmdb dbip-city-lite.mmdb && echo "GeoIP: DB-IP City Lite $month (commit ${RAILWAY_GIT_COMMIT_SHA:-unknown})" && break; \
+		fi; \
+		rm -f db.mmdb.gz db.mmdb; \
+	done; \
+	[ -f dbip-city-lite.mmdb ] || echo "GeoIP: download failed, views will have no location"
+
 FROM base AS runner
 WORKDIR /app
 
@@ -33,6 +45,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/database/migrations ./apps/web/migrations
 
+
+COPY --from=geoip --chown=nextjs:nodejs /geoip /app/geoip
+ENV CAP_GEOIP_DATABASE_PATH=/app/geoip/dbip-city-lite.mmdb
 
 USER nextjs
 
