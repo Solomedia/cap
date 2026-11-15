@@ -55,6 +55,7 @@ What we carry on top of upstream. `git log --first-parent --oneline main..smg` i
 | `feat/share-unfurl-ai-summary` | A | Not opened (improvement, not a fix; propose later if wanted) | In smg ([#11](https://github.com/Solomedia/cap/pull/11)) | `apps/web/app/s/[videoId]/page.tsx`, `apps/web/lib/share-video-metadata.ts` |
 | `feat/google-account-linking` | A | [CapSoftware/Cap#3964](https://github.com/CapSoftware/Cap/pull/3964) | In smg ([#12](https://github.com/Solomedia/cap/pull/12)), PR open upstream | `packages/database/auth/auth-options.ts`, `apps/web/app/(org)/login/form.tsx` |
 | `feat/self-hosted-geoip` | A | [CapSoftware/Cap#4158](https://github.com/CapSoftware/Cap/pull/4158) | In smg ([#21](https://github.com/Solomedia/cap/pull/21), [#23](https://github.com/Solomedia/cap/pull/23)), PR open upstream | `apps/web/app/api/analytics/track/route.ts`, `apps/web/app/api/mobile/[...route]/route.ts`, `packages/env/server.ts`, `apps/web/package.json`, `bun.lock`, `README.md` |
+| `internal/transcript-backfill` | B | Not opened (operator route for our imported backlog) | PR open into smg ([#26](https://github.com/Solomedia/cap/pull/26)) | None: new files only (`apps/web/app/api/internal/transcripts/backfill/route.ts`, `apps/web/lib/transcript-backfill.ts`, its unit test) |
 
 Type A: upstream-able (`feat/*`). Type B: SMG-only (`internal/*`). States: `In smg`, `PR open`, `Merged upstream`, `Rejected upstream → SMG-only`.
 
