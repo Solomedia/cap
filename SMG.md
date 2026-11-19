@@ -32,17 +32,20 @@ GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap --dry-run
 GH_TOKEN=$(gh auth token) bun scripts/smg/sync.ts --repo Solomedia/cap
 ```
 
-The first command only prints what would happen. The second one fast-forwards `main`, turns off any new upstream workflow, and opens the sync PR into `smg` (auto-merge on green CI, or held when it brings migrations). It uses a temporary worktree, so your checkout and branch are not touched.
+The first command only prints what would happen. The second one fast-forwards `main`, turns off any new upstream workflow, and opens the sync PR into `smg` (auto-merge on green CI, or held when it brings migrations). It uses a temporary worktree, so your checkout and branch are not touched. `scripts/smg/sync.ts` exists only on `smg`, so run it from a checkout or worktree of `smg`.
+
+When the merge into `smg` conflicts, the script opens an `upstream-conflict` issue instead of a PR. Resolve it on the `sync/upstream-*` branch the issue names, open the PR into `smg` with `Closes #<issue>`, and merge it with a merge commit. A new upstream workflow is only disabled once GitHub has registered it; if one runs on the fork, disable it with `gh workflow disable <file> --repo Solomedia/cap`.
 
 ## Deploys and Railway config
 
 Cap Web's Railway settings live in [`.railway/railway.ts`](.railway/railway.ts) as Railway Infrastructure as Code (not the deprecated `railway.json`). It is a partial that owns only Cap Web; MySQL, Cap Media Server, Cap Loom Importer and `cap-admin-library-sync` stay in the dashboard. Variables and secrets are not in the file: they stay in Railway.
 
 - **Config changes** go through a PR that touches `.railway/`. `SMG Railway plan` comments the plan on the PR; merging applies that exact plan (`SMG Railway apply`). Preview locally with `railway config plan` from a linked checkout.
-- **Code changes** deploy when they reach `smg`. Railway builds `smg/web.Dockerfile` from `smg` and waits for the `SMG CI` run on that push ("Wait for CI"): if it fails, that commit is not deployed.
+- **Code changes** deploy when they reach `smg`. Railway builds `smg/web.Dockerfile` from `smg` and waits for the `SMG CI` run on that push ("Wait for CI"): if it fails, that commit is not deployed. Railway has twice started no deployment at all for a sync merge (2026-11-13 and 2026-11-19), so after merging a sync, check that a Cap Web deployment shows up. If none does, deploy the commit with the GraphQL mutation `serviceInstanceDeployV2(serviceId, environmentId, commitSha)`, passing the full 40-character SHA.
 - **`smg/web.Dockerfile`** is `apps/web/Dockerfile` without the `# syntax=` line (Railway rejects external Dockerfile frontends) and with the cache mount ids Railway requires (`s/<service id>-<path>`); we don't patch upstream's file. When a sync changes upstream's Dockerfile, the `scripts` check fails until you run `bun scripts/smg/railway-dockerfile.ts --write` on the sync branch and commit the result.
 - **View locations** come from DB-IP City Lite (free, CC BY 4.0, attribution: "IP Geolocation by [DB-IP](https://db-ip.com)"). The generator adds a `geoip` stage to `smg/web.Dockerfile` that downloads the current month's file on every build and sets `CAP_GEOIP_DATABASE_PATH` (read by `feat/self-hosted-geoip`). A failed download doesn't fail the build; views just have no country or city until the next deploy, and the build log says so.
-- **Migrations** run when Cap Web starts, and a rollback doesn't undo them. That is why a PR that adds one needs the `migrations-approved` label, given after a MySQL backup.
+- **Migrations** run when Cap Web starts, and a rollback doesn't undo them. That is why a PR that adds one needs the `migrations-approved` label, given after reading the migration SQL. MySQL has Railway's automatic backups and point-in-time recovery, so no manual dump is taken first; if a migration goes wrong, restore from those.
+- **Cap Media Server** runs upstream's official image, `ghcr.io/capsoftware/cap-media-server:latest`, which upstream publishes on every push to `main`. Railway's image auto-updates redeploy it when that tag moves, only in the nightly window (02:00 to 06:00 UTC, every day), with 300 s of draining so in-flight jobs can finish. To roll back, redeploy an earlier deployment. Cap Loom Importer stays pinned by digest, since the Loom import is over.
 - **To pause deploys**, turn off the GitHub autodeploy on Cap Web in Railway. To roll back, redeploy an earlier deployment from the Railway dashboard.
 
 ## Patch ledger
@@ -60,6 +63,20 @@ What we carry on top of upstream. `git log --first-parent --oneline main..smg` i
 Type A: upstream-able (`feat/*`). Type B: SMG-only (`internal/*`). States: `In smg`, `PR open`, `Merged upstream`, `Rejected upstream → SMG-only`.
 
 Dropped: `feat/members-table-search` (2026-11-13). Upstream rewrote the members card with its own name and email search, so the 2026-11-13 sync takes upstream's version and [CapSoftware/Cap#3919](https://github.com/CapSoftware/Cap/pull/3919) was closed. The role and status filters and column sorting went with it.
+
+## When we drop the fork
+
+The fork exists to carry fixes upstream hasn't merged yet. Once what we carry weighs little next to the cost of keeping it (the weekly sync, its conflicts, our own CI and deploys), we stop running our build:
+
+- Cap Web goes back to upstream's official image (`ghcr.io/capsoftware/cap-web:latest`) with Railway image auto-updates in the nightly window, like Cap Media Server.
+- `Solomedia/cap` stays only to send non-urgent fixes upstream as PRs, which we can wait for.
+
+Measured on 2026-11-19, two things keep it today:
+
+- **Patches we can't lose yet:** Google account linking ([CapSoftware/Cap#3964](https://github.com/CapSoftware/Cap/pull/3964)), without which accounts imported from Loom can't sign in with Google, and the preview OG fix ([CapSoftware/Cap#3963](https://github.com/CapSoftware/Cap/pull/3963)), without which Slack previews break on our domain. GeoIP view locations and the AI summary in link previews are nice to have; the transcript backfill route has done its job.
+- **Upstream publishes `cap-web` by hand:** `docker-build-web.yml` is `workflow_dispatch` only. Recent builds were 2026-06-30, 07-16, 09-07, 11-04 and 11-16, so on the official image updates arrive with gaps of up to two months.
+
+Revisit at each sync. Drop the fork when #3964 and #3963 are merged upstream (or no longer needed) and the official image is published often enough to rely on.
 
 ## Scope
 
