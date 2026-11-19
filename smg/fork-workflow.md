@@ -27,7 +27,7 @@ Non-goals
 - Desktop app, CLI, iOS app and Chrome extension. We use the official builds. Scope is `apps/web`, `apps/media-server` and shared `packages/*` (already in `SMG.md`).
 - Running upstream's own CI on the fork.
 - A staging environment in the first version (see section 12).
-- Building or deploying `Cap Media Server` and `Cap Loom Importer` in the first version. Upstream publishes `cap-media-server` on every push to `main`, so the official image stays current. Both services stay on the official image pinned by digest, with Railway auto-updates turned off so neither restarts on its own (the importer runs Loom imports with a volume and a 600 s drain). Their digest is bumped by hand when a sync needs it. *(Builder call.)*
+- Building or deploying `Cap Media Server` and `Cap Loom Importer` in the first version. Upstream publishes `cap-media-server` on every push to `main`, so the official image stays current. Both services stay on the official image pinned by digest, with Railway auto-updates turned off so neither restarts on its own (the importer runs Loom imports with a volume and a 600 s drain). Their digest is bumped by hand when a sync needs it. *(Builder call.)* Changed on 2026-11-19 (section 16): with the Loom import over, Cap Media Server follows `:latest` with nightly auto-updates; Cap Loom Importer stays pinned.
 
 Anti-goals (failure even if it "works")
 - A deploy during an announced long job (Loom import, bulk transcription) that orphans in-flight work. Short user-triggered jobs interrupted by a deploy are an accepted trade-off (section 8).
@@ -90,7 +90,7 @@ Until the sync bot exists (decided by Hildegar, 2026-11-08: not created yet), th
 3. **No conflict:** open a PR into `smg` titled `Sync upstream <date> (<n> commits)` with the upstream commit list, enable auto-merge. CI runs (section 8); when green it merges and deploys in the same window.
 4. **Conflict:** open an **issue** labeled `upstream-conflict` (a PR with no diff cannot be opened) listing the conflicting files and the `smg` commits that touched each. A developer resolves it on a `sync/upstream-*` branch and opens the PR. Later syncs keep `main` current but open no new sync PR until the issue is closed, so conflicts never stack.
 5. If there are no new upstream commits, do nothing.
-6. **Migration gate:** if the sync adds files under `packages/database/migrations/**`, the PR gets label `has-migrations` and no auto-merge. A developer reads the migrations, takes a MySQL backup, adds the `migrations-approved` label and merges by hand. The same gate applies to every PR into `smg`, not only syncs: a `feat/*` branch cut from a newer `main`, or a conflict fix, can also bring upstream migrations (the `migrations` check in `smg-ci`). Migrations run on server start and before the healthcheck, so rolling back the image digest does not roll back the schema. *(Builder call.)*
+6. **Migration gate:** if the sync adds files under `packages/database/migrations/**`, the PR gets label `has-migrations` and no auto-merge. A developer reads the migrations, adds the `migrations-approved` label and merges by hand. Railway's automatic MySQL backups and point-in-time recovery cover a bad migration, so no manual dump is taken (section 16). The same gate applies to every PR into `smg`, not only syncs: a `feat/*` branch cut from a newer `main`, or a conflict fix, can also bring upstream migrations (the `migrations` check in `smg-ci`). Migrations run on server start and before the healthcheck, so rolling back the image digest does not roll back the schema. *(Builder call.)*
 
 Developers should enable `git config rerere.enabled true` locally so a resolved conflict is reused if it reappears.
 
@@ -121,7 +121,7 @@ One sync PR at a time: while a sync PR is open (pending, red or held for migrati
 4. Wait for the deployment to report success and `/api/status` to return 200. On failure, mark the run failed; Railway keeps the previous container serving because the healthcheck gates the switch.
 5. Write the digest, commit and previous digest to the job summary.
 
-Rollback: run `smg-deploy` manually with the previous digest, or use Railway's rollback. The previous digest is always in the last successful run's summary. A rollback across a deploy that ran migrations is code-only: the schema stays new. Use it only when the old code is known to work with the new schema; otherwise restore the backup taken at the migration gate (section 6).
+Rollback: run `smg-deploy` manually with the previous digest, or use Railway's rollback. The previous digest is always in the last successful run's summary. A rollback across a deploy that ran migrations is code-only: the schema stays new. Use it only when the old code is known to work with the new schema; otherwise restore MySQL from Railway's automatic backups or point-in-time recovery (section 16).
 
 Deploy freeze: set `SMG_DEPLOY_FREEZE=true` before any long-running job on Cap Web (Loom imports, bulk transcription) and back to `false` after. Syncs and merges keep building images during a freeze; the first deploy after unfreezing ships the latest.
 
@@ -187,7 +187,7 @@ Left to the builder
 
 - **Rebased patch stack on top of `main`:** clean history, but force pushes on the deploy branch, blocked by our hooks, breaks open branches and loses the link between production and a stable commit.
 - ~~**Railway building from the repo:** every push redeploys automatically with no freeze or approval, the monorepo build runs on Railway's builders, and rollback is coarser than a digest.~~ Reversed on 2026-11-09 (section 15): Wait for CI gates each deploy, the autodeploy toggle is the freeze, and Railway rolls back to any earlier deployment.
-- **Keeping the official image and patching nothing:** upstream publishes `cap-web` by hand with gaps of up to two months, so we would wait for fixes even with zero patches.
+- **Keeping the official image and patching nothing:** upstream publishes `cap-web` by hand with gaps of up to two months, so we would wait for fixes even with zero patches. `SMG.md` ("When we drop the fork") lists what has to change before we go back to it.
 
 ## 15. Amendment 2026-11-09: Railway builds from GitHub, config as IaC
 
@@ -199,3 +199,12 @@ Decided by Hildegar on 2026-11-09, replacing the GHCR image and our deploy scrip
 - **Freeze and rollback:** turn off Cap Web's GitHub autodeploy to stop deploys; roll back by redeploying an earlier deployment in Railway. The migration gate (section 6) is unchanged and still the only protection for the schema.
 - **Why:** less code of ours on the way to production (the deploy script called Railway GraphQL mutations never tested against production), one environment (no need for one image deployed in several places), and infra changes reviewed in PRs.
 - **Cutover:** a separate PR switches the source from the official image, merged in a maintenance window: MySQL backup, Loom import paused and drained, official digest `e2dbc1e8…` kept for rollback.
+
+## 16. Amendment 2026-11-19: nightly media server updates, Railway backups
+
+Decided by Hildegar on 2026-11-19.
+
+- **Cap Media Server:** follows `ghcr.io/capsoftware/cap-media-server:latest` instead of a pinned digest. Railway's image auto-updates redeploy it when that tag moves (upstream publishes it on every push to `main`), only in the nightly window (02:00 to 06:00 UTC, every day), with 300 s of draining so in-flight jobs can finish. Pinning only protected the Loom import, which is over. Rollback: redeploy an earlier deployment. The window lives in the environment config (`services.<id>.source.autoUpdates`), set with the GraphQL mutation `environmentPatchCommit`; `serviceInstanceUpdate` only sets the image. Cap Loom Importer stays pinned by digest.
+- **MySQL backups:** Railway takes automatic backups and offers point-in-time recovery, so the migration gate (section 6) no longer includes a manual dump. The gate itself is unchanged: read the migrations, add `migrations-approved`, merge by hand.
+- **Missing deployments:** twice (2026-11-13 and 2026-11-19) Railway started no Cap Web deployment for a sync merge into `smg`, not even a skipped one. After merging a sync, check that a deployment shows up; if none does, deploy the commit with `serviceInstanceDeployV2(serviceId, environmentId, commitSha)` and the full 40-character SHA.
+- **Leaving the fork:** the criteria to go back to the official `cap-web` image and keep the fork only for upstream PRs are in `SMG.md`, "When we drop the fork".
